@@ -1,0 +1,3 @@
+Program: Just Over 30 Min
+Expected: 2
+Actual: 3
