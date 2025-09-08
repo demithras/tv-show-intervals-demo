@@ -1,11 +1,11 @@
 -- TV Show Intervals Demo Schema
 -- This schema creates tables and triggers to automatically calculate
--- 14-minute intervals for TV programs
+-- 15-minute intervals for TV programs
 
 -- Drop existing objects if they exist (for clean setup)
 DROP TRIGGER IF EXISTS trigger_update_program_intervals ON programs;
 DROP FUNCTION IF EXISTS update_program_intervals();
-DROP FUNCTION IF EXISTS count_14min_intervals(TIME, TIME);
+DROP FUNCTION IF EXISTS count_15min_intervals(TIME, TIME);
 DROP TABLE IF EXISTS program_intervals;
 DROP TABLE IF EXISTS programs;
 
@@ -19,7 +19,7 @@ CREATE TABLE programs (
     UNIQUE(program_name, start_time, end_time)
 );
 
--- Program intervals table: stores calculated 14-minute intervals
+-- Program intervals table: stores calculated 15-minute intervals
 CREATE TABLE program_intervals (
     id SERIAL PRIMARY KEY,
     program_name VARCHAR(255) NOT NULL,
@@ -29,14 +29,14 @@ CREATE TABLE program_intervals (
     UNIQUE(program_name)
 );
 
--- Function to count 14-minute intervals
+-- Function to count 15-minute intervals
 -- Handles overnight programs (crossing midnight)
 -- Rules:
 -- - If start == end → 0 intervals
--- - If duration < 14 minutes → 0 intervals  
--- - If duration is exactly N*14 minutes → N intervals
+-- - If duration < 15 minutes → 0 intervals  
+-- - If duration is exactly N*15 minutes → N intervals
 -- - Handles midnight crossing correctly
-CREATE OR REPLACE FUNCTION count_14min_intervals(start_time TIME, end_time TIME)
+CREATE OR REPLACE FUNCTION count_15min_intervals(start_time TIME, end_time TIME)
 RETURNS INTEGER AS $$
 DECLARE
     duration_minutes INTEGER;
@@ -57,9 +57,9 @@ BEGIN
         duration_minutes := EXTRACT(EPOCH FROM (end_time - start_time)) / 60;
     END IF;
     
-    -- Return number of complete 14-minute intervals
-    -- If duration < 14 minutes, this returns 0
-    RETURN duration_minutes / 14;
+    -- Return number of complete 15-minute intervals
+    -- If duration < 15 minutes, this returns 0
+    RETURN duration_minutes / 15;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -74,10 +74,10 @@ BEGIN
     ELSIF TG_OP = 'INSERT' THEN
         -- Insert or update program_intervals when new program is added
         INSERT INTO program_intervals (program_name, interval_count)
-        VALUES (NEW.program_name, count_14min_intervals(NEW.start_time, NEW.end_time))
+        VALUES (NEW.program_name, count_15min_intervals(NEW.start_time, NEW.end_time))
         ON CONFLICT (program_name) 
         DO UPDATE SET 
-            interval_count = count_14min_intervals(NEW.start_time, NEW.end_time),
+            interval_count = count_15min_intervals(NEW.start_time, NEW.end_time),
             updated_at = CURRENT_TIMESTAMP;
         RETURN NEW;
     ELSIF TG_OP = 'UPDATE' THEN
@@ -90,10 +90,10 @@ BEGIN
         
         -- Insert or update with new values
         INSERT INTO program_intervals (program_name, interval_count)
-        VALUES (NEW.program_name, count_14min_intervals(NEW.start_time, NEW.end_time))
+        VALUES (NEW.program_name, count_15min_intervals(NEW.start_time, NEW.end_time))
         ON CONFLICT (program_name) 
         DO UPDATE SET 
-            interval_count = count_14min_intervals(NEW.start_time, NEW.end_time),
+            interval_count = count_15min_intervals(NEW.start_time, NEW.end_time),
             updated_at = CURRENT_TIMESTAMP;
         RETURN NEW;
     END IF;
@@ -115,6 +115,6 @@ CREATE INDEX idx_intervals_name ON program_intervals(program_name);
 
 -- Add some helpful comments
 COMMENT ON TABLE programs IS 'TV programs with their daily time slots';
-COMMENT ON TABLE program_intervals IS 'Automatically calculated 14-minute intervals for each program';
-COMMENT ON FUNCTION count_14min_intervals(TIME, TIME) IS 'Calculates number of 14-minute intervals, handling overnight programs';
+COMMENT ON TABLE program_intervals IS 'Automatically calculated 15-minute intervals for each program';
+COMMENT ON FUNCTION count_15min_intervals(TIME, TIME) IS 'Calculates number of 15-minute intervals, handling overnight programs';
 COMMENT ON TRIGGER trigger_update_program_intervals ON programs IS 'Automatically maintains program_intervals table when programs change';
