@@ -168,4 +168,4 @@ Feature: TV Program 15-Minute Interval Calculation
   Scenario: CI/CD Test Scenario - Validate comment posting
     Given I have a program "CI Test Program" that runs from "10:00" to "10:30"
     When I insert the program into the database
-    Then the program "CI Test Program" should have 99 intervals
+    Then the program "CI Test Program" should have 2 intervals
