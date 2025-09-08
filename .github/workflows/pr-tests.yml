@@ -95,42 +95,32 @@ jobs:
             
             PASSED=$((TOTAL_TESTS - FAILURES - ERRORS))
             
-            # Create comment body
-            cat > test-comment.md << EOF
-          ## 🧪 BDD Test Results
-          
-          **Summary:**
-          - ✅ **Passed:** ${PASSED}
-          - ❌ **Failed:** ${FAILURES}
-          - 🔥 **Errors:** ${ERRORS}
-          - 📊 **Total:** ${TOTAL_TESTS}
-          
-          $(if [ $FAILURES -gt 0 ] || [ $ERRORS -gt 0 ]; then
-            echo "**Status:** ❌ Tests failed"
-            echo ""
-            echo "Some tests are failing. This might be expected if testing the CI/CD pipeline with intentional failures."
-          else
-            echo "**Status:** ✅ All tests passed"
-          fi)
-          
-          <details>
-          <summary>🔍 View detailed results</summary>
-          
-          \`\`\`
-          $(cat test-results.xml | head -50)
-          \`\`\`
-          
-          </details>
+            # Determine status
+            if [ $FAILURES -gt 0 ] || [ $ERRORS -gt 0 ]; then
+              STATUS="❌ Tests failed"
+              ADDITIONAL_TEXT="Some tests are failing. This might be expected if testing the CI/CD pipeline with intentional failures."
+            else
+              STATUS="✅ All tests passed"
+              ADDITIONAL_TEXT=""
+            fi
+            
+            # Create comment body as JSON for API
+            cat > comment-payload.json << EOF
+          {
+            "body": "## 🧪 BDD Test Results\n\n**Summary:**\n- ✅ **Passed:** ${PASSED}\n- ❌ **Failed:** ${FAILURES}\n- 🔥 **Errors:** ${ERRORS}\n- 📊 **Total:** ${TOTAL_TESTS}\n\n**Status:** ${STATUS}\n\n${ADDITIONAL_TEXT}\n\n<details>\n<summary>🔍 View detailed results</summary>\n\n\`\`\`xml\n$(cat test-results.xml | head -20 | sed 's/"/\\"/g')\n\`\`\`\n\n</details>"
+          }
           EOF
             
-            # Comment on PR using GitHub CLI if available, or skip
-            if command -v gh &> /dev/null; then
-              gh pr comment --body-file test-comment.md
-            else
-              echo "GitHub CLI not available, skipping PR comment"
-              echo "Test results summary:"
-              cat test-comment.md
-            fi
+            # Post comment using GitHub API
+            curl -L \
+              -X POST \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer $GITHUB_TOKEN" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/$GITHUB_REPOSITORY/issues/${{ github.event.number }}/comments" \
+              -d @comment-payload.json
+              
+            echo "Posted test results comment to PR #${{ github.event.number }}"
           else
             echo "No test results file found"
           fi
