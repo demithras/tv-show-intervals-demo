@@ -12,10 +12,12 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
 
 permissions:
-  contents: read
+  contents: write
   pull-requests: write
   checks: write
   statuses: write
+  pages: write
+  id-token: write
 
 jobs:
   test:
@@ -112,7 +114,11 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./allure-report
           destination_dir: pr-${{ github.event.number }}
-          keep_files: false
+          keep_files: true
+          force_orphan: false
+          user_name: 'github-actions[bot]'
+          user_email: 'github-actions[bot]@users.noreply.github.com'
+          commit_message: 'Deploy Allure report for PR #${{ github.event.number }}'
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
