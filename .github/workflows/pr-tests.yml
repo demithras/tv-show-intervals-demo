@@ -69,8 +69,6 @@ jobs:
           pytest -v --tb=short \
             --junitxml=test-results.xml \
             --alluredir=allure-results \
-            --allure-features \
-            --allure-stories \
             --allure-link-pattern=issue:https://github.com/${{ github.repository }}/issues/{} \
             --allure-link-pattern=test_case:https://github.com/${{ github.repository }}/blob/${{ github.sha }}/features/{}
 
