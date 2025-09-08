@@ -1,73 +1,73 @@
 "Status","Start Time","Stop Time","Duration in ms","Parent Suite","Suite","Sub Suite","Test Class","Test Method","Name","Description"
-"passed","Mon Sep 08 19:36:34 UTC 2025","Mon Sep 08 19:36:35 UTC 2025","860","","","","","","Program shorter than 15 minutes has zero intervals","As a TV scheduling system
+"passed","Mon Sep 08 19:46:57 UTC 2025","Mon Sep 08 19:46:58 UTC 2025","674","","","","","","Overnight program with longer duration","As a TV scheduling system
 I want to automatically calculate 15-minute intervals for programs
 So that I can track program duration in standardized time blocks"
-"passed","Mon Sep 08 19:36:48 UTC 2025","Mon Sep 08 19:36:49 UTC 2025","1140","","","","","","Deleting a program removes its intervals","As a TV scheduling system
+"passed","Mon Sep 08 19:47:09 UTC 2025","Mon Sep 08 19:47:10 UTC 2025","669","","","","","","Program exactly 31 minutes should have two intervals","As a TV scheduling system
 I want to automatically calculate 15-minute intervals for programs
 So that I can track program duration in standardized time blocks"
-"passed","Mon Sep 08 19:36:45 UTC 2025","Mon Sep 08 19:36:45 UTC 2025","711","","","","","","Empty database has no intervals","As a TV scheduling system
+"passed","Mon Sep 08 19:46:54 UTC 2025","Mon Sep 08 19:46:55 UTC 2025","669","","","","","","Program exactly 30 minutes long has two intervals","As a TV scheduling system
 I want to automatically calculate 15-minute intervals for programs
 So that I can track program duration in standardized time blocks"
-"passed","Mon Sep 08 19:36:37 UTC 2025","Mon Sep 08 19:36:37 UTC 2025","854","","","","","","Program exactly 30 minutes long has two intervals","As a TV scheduling system
+"passed","Mon Sep 08 19:46:50 UTC 2025","Mon Sep 08 19:46:51 UTC 2025","1485","","","","","","Program with same start and end time has zero intervals","As a TV scheduling system
 I want to automatically calculate 15-minute intervals for programs
 So that I can track program duration in standardized time blocks"
-"passed","Mon Sep 08 19:36:55 UTC 2025","Mon Sep 08 19:36:56 UTC 2025","856","","","","","","Program exactly 31 minutes should have two intervals","As a TV scheduling system
+"passed","Mon Sep 08 19:47:04 UTC 2025","Mon Sep 08 19:47:05 UTC 2025","1008","","","","","","Program name change updates intervals table","As a TV scheduling system
 I want to automatically calculate 15-minute intervals for programs
 So that I can track program duration in standardized time blocks"
-"passed","Mon Sep 08 19:37:01 UTC 2025","Mon Sep 08 19:37:02 UTC 2025","855","","","","","","Very long overnight program - almost full day","As a TV scheduling system
+"passed","Mon Sep 08 19:47:06 UTC 2025","Mon Sep 08 19:47:06 UTC 2025","670","","","","","","Program exactly 14 minutes should have zero intervals","As a TV scheduling system
 I want to automatically calculate 15-minute intervals for programs
 So that I can track program duration in standardized time blocks"
-"passed","Mon Sep 08 19:37:05 UTC 2025","Mon Sep 08 19:37:06 UTC 2025","856","","","","","","Large intervals - 6 hour program","As a TV scheduling system
+"passed","Mon Sep 08 19:47:12 UTC 2025","Mon Sep 08 19:47:13 UTC 2025","670","","","","","","One minute before midnight to one minute after midnight","As a TV scheduling system
 I want to automatically calculate 15-minute intervals for programs
 So that I can track program duration in standardized time blocks"
-"passed","Mon Sep 08 19:36:39 UTC 2025","Mon Sep 08 19:36:40 UTC 2025","855","","","","","","Overnight program crossing midnight","As a TV scheduling system
+"passed","Mon Sep 08 19:47:08 UTC 2025","Mon Sep 08 19:47:08 UTC 2025","670","","","","","","Program exactly 29 minutes should have one interval","As a TV scheduling system
 I want to automatically calculate 15-minute intervals for programs
 So that I can track program duration in standardized time blocks"
-"passed","Mon Sep 08 19:37:03 UTC 2025","Mon Sep 08 19:37:03 UTC 2025","855","","","","","","Exactly one hour program","As a TV scheduling system
+"passed","Mon Sep 08 19:47:03 UTC 2025","Mon Sep 08 19:47:04 UTC 2025","896","","","","","","Deleting a program removes its intervals","As a TV scheduling system
 I want to automatically calculate 15-minute intervals for programs
 So that I can track program duration in standardized time blocks"
-"passed","Mon Sep 08 19:37:07 UTC 2025","Mon Sep 08 19:37:10 UTC 2025","3135","","","","","","Multiple boundary cases in one test","As a TV scheduling system
+"passed","Mon Sep 08 19:46:52 UTC 2025","Mon Sep 08 19:46:53 UTC 2025","681","","","","","","Program shorter than 15 minutes has zero intervals","As a TV scheduling system
 I want to automatically calculate 15-minute intervals for programs
 So that I can track program duration in standardized time blocks"
-"passed","Mon Sep 08 19:36:41 UTC 2025","Mon Sep 08 19:36:42 UTC 2025","855","","","","","","Overnight program with longer duration","As a TV scheduling system
+"passed","Mon Sep 08 19:46:56 UTC 2025","Mon Sep 08 19:46:57 UTC 2025","670","","","","","","Overnight program crossing midnight","As a TV scheduling system
 I want to automatically calculate 15-minute intervals for programs
 So that I can track program duration in standardized time blocks"
-"passed","Mon Sep 08 19:37:04 UTC 2025","Mon Sep 08 19:37:05 UTC 2025","856","","","","","","Maximum daily program - full 24 hours","As a TV scheduling system
+"passed","Mon Sep 08 19:47:10 UTC 2025","Mon Sep 08 19:47:11 UTC 2025","670","","","","","","Midnight boundary - program ending exactly at midnight","As a TV scheduling system
 I want to automatically calculate 15-minute intervals for programs
 So that I can track program duration in standardized time blocks"
-"passed","Mon Sep 08 19:37:00 UTC 2025","Mon Sep 08 19:37:01 UTC 2025","855","","","","","","One minute before midnight to one minute after midnight","As a TV scheduling system
+"passed","Mon Sep 08 19:47:07 UTC 2025","Mon Sep 08 19:47:07 UTC 2025","670","","","","","","Program exactly 16 minutes should have one interval","As a TV scheduling system
 I want to automatically calculate 15-minute intervals for programs
 So that I can track program duration in standardized time blocks"
-"passed","Mon Sep 08 19:36:53 UTC 2025","Mon Sep 08 19:36:53 UTC 2025","856","","","","","","Program exactly 16 minutes should have one interval","As a TV scheduling system
+"passed","Mon Sep 08 19:47:13 UTC 2025","Mon Sep 08 19:47:14 UTC 2025","670","","","","","","Very long overnight program - almost full day","As a TV scheduling system
 I want to automatically calculate 15-minute intervals for programs
 So that I can track program duration in standardized time blocks"
-"passed","Mon Sep 08 19:36:54 UTC 2025","Mon Sep 08 19:36:55 UTC 2025","854","","","","","","Program exactly 29 minutes should have one interval","As a TV scheduling system
+"passed","Mon Sep 08 19:46:59 UTC 2025","Mon Sep 08 19:47:00 UTC 2025","1340","","","","","","Multiple programs with different interval counts","As a TV scheduling system
 I want to automatically calculate 15-minute intervals for programs
 So that I can track program duration in standardized time blocks"
-"passed","Mon Sep 08 19:36:31 UTC 2025","Mon Sep 08 19:36:33 UTC 2025","1876","","","","","","Program with same start and end time has zero intervals","As a TV scheduling system
+"passed","Mon Sep 08 19:47:14 UTC 2025","Mon Sep 08 19:47:15 UTC 2025","670","","","","","","Exactly one hour program","As a TV scheduling system
 I want to automatically calculate 15-minute intervals for programs
 So that I can track program duration in standardized time blocks"
-"passed","Mon Sep 08 19:36:51 UTC 2025","Mon Sep 08 19:36:52 UTC 2025","856","","","","","","Program exactly 14 minutes should have zero intervals","As a TV scheduling system
+"passed","Mon Sep 08 19:46:55 UTC 2025","Mon Sep 08 19:46:56 UTC 2025","670","","","","","","Program spanning multiple intervals with partial duration","As a TV scheduling system
 I want to automatically calculate 15-minute intervals for programs
 So that I can track program duration in standardized time blocks"
-"passed","Mon Sep 08 19:36:57 UTC 2025","Mon Sep 08 19:36:58 UTC 2025","855","","","","","","Midnight boundary - program ending exactly at midnight","As a TV scheduling system
+"passed","Mon Sep 08 19:46:53 UTC 2025","Mon Sep 08 19:46:54 UTC 2025","669","","","","","","Program exactly 15 minutes long has one interval","As a TV scheduling system
 I want to automatically calculate 15-minute intervals for programs
 So that I can track program duration in standardized time blocks"
-"passed","Mon Sep 08 19:36:38 UTC 2025","Mon Sep 08 19:36:39 UTC 2025","861","","","","","","Program spanning multiple intervals with partial duration","As a TV scheduling system
+"passed","Mon Sep 08 19:47:11 UTC 2025","Mon Sep 08 19:47:12 UTC 2025","670","","","","","","Midnight boundary - program starting exactly at midnight","As a TV scheduling system
 I want to automatically calculate 15-minute intervals for programs
 So that I can track program duration in standardized time blocks"
-"passed","Mon Sep 08 19:36:35 UTC 2025","Mon Sep 08 19:36:36 UTC 2025","854","","","","","","Program exactly 15 minutes long has one interval","As a TV scheduling system
+"passed","Mon Sep 08 19:47:18 UTC 2025","Mon Sep 08 19:47:20 UTC 2025","2457","","","","","","Multiple boundary cases in one test","As a TV scheduling system
 I want to automatically calculate 15-minute intervals for programs
 So that I can track program duration in standardized time blocks"
-"passed","Mon Sep 08 19:36:42 UTC 2025","Mon Sep 08 19:36:44 UTC 2025","1711","","","","","","Multiple programs with different interval counts","As a TV scheduling system
+"passed","Mon Sep 08 19:47:16 UTC 2025","Mon Sep 08 19:47:16 UTC 2025","672","","","","","","Maximum daily program - full 24 hours","As a TV scheduling system
 I want to automatically calculate 15-minute intervals for programs
 So that I can track program duration in standardized time blocks"
-"passed","Mon Sep 08 19:36:46 UTC 2025","Mon Sep 08 19:36:47 UTC 2025","1141","","","","","","Updating a program recalculates intervals","As a TV scheduling system
+"passed","Mon Sep 08 19:47:17 UTC 2025","Mon Sep 08 19:47:17 UTC 2025","670","","","","","","Large intervals - 6 hour program","As a TV scheduling system
 I want to automatically calculate 15-minute intervals for programs
 So that I can track program duration in standardized time blocks"
-"passed","Mon Sep 08 19:36:49 UTC 2025","Mon Sep 08 19:36:51 UTC 2025","1285","","","","","","Program name change updates intervals table","As a TV scheduling system
+"passed","Mon Sep 08 19:47:01 UTC 2025","Mon Sep 08 19:47:02 UTC 2025","896","","","","","","Updating a program recalculates intervals","As a TV scheduling system
 I want to automatically calculate 15-minute intervals for programs
 So that I can track program duration in standardized time blocks"
-"passed","Mon Sep 08 19:36:58 UTC 2025","Mon Sep 08 19:36:59 UTC 2025","855","","","","","","Midnight boundary - program starting exactly at midnight","As a TV scheduling system
+"passed","Mon Sep 08 19:47:00 UTC 2025","Mon Sep 08 19:47:01 UTC 2025","558","","","","","","Empty database has no intervals","As a TV scheduling system
 I want to automatically calculate 15-minute intervals for programs
 So that I can track program duration in standardized time blocks"
