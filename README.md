@@ -261,9 +261,27 @@ The GitHub Action (`.github/workflows/pr-tests.yml`) automatically:
 
 - ✅ **Isolated Testing**: Each PR gets its own database branch
 - ✅ **Automatic Setup**: GitHub App handles most configuration
-- ✅ **Test Results**: Formatted test results in PR comments
+- ✅ **Rich Test Reports**: Beautiful Allure reports with detailed analytics
+- ✅ **Interactive Reports**: Published to GitHub Pages for easy access
+- ✅ **Test History**: Track test trends over time
 - ✅ **Cost Effective**: Branches are automatically cleaned up
 - ✅ **No Local DB Required**: Tests run entirely in the cloud
+
+### Allure Reports
+
+The workflow generates comprehensive Allure reports that include:
+
+- 📊 **Test Overview**: Pass/fail rates, execution times, test trends
+- 🎯 **BDD Scenarios**: Gherkin steps with detailed execution logs
+- 📋 **Test Steps**: Granular step-by-step execution details
+- 📎 **Attachments**: Database queries, program data, and debug info
+- 🏷️ **Categories**: Organized by features, stories, and test types
+- 📈 **History**: Test execution trends across PR runs
+
+**Accessing Reports:**
+- Click the Allure Report link in PR comments
+- Visit: `https://your-username.github.io/your-repo-name/pr-{number}`
+- Download artifacts from GitHub Actions run page
 
 ### Manual Testing
 
