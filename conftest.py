@@ -8,6 +8,7 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 import time
 import os
+from urllib.parse import urlparse
 
 
 @pytest.fixture(scope="session")
@@ -15,19 +16,31 @@ def db_connection():
     """
     Create a database connection for the test session.
     Retries connection in case the database is still starting up.
-    Uses environment variables for connection details if available,
-    otherwise falls back to local defaults.
+    Uses DATABASE_URL environment variable if available,
+    otherwise uses individual environment variables or defaults.
     """
     connection = None
     max_retries = 10
     retry_delay = 2
     
-    # Get connection details from environment or use defaults
-    db_host = os.getenv("DB_HOST", "localhost")
-    db_port = int(os.getenv("DB_PORT", "5432"))
-    db_name = os.getenv("DB_NAME", "demo")
-    db_user = os.getenv("DB_USER", "demo")
-    db_password = os.getenv("DB_PASSWORD", "demo")
+    # Check if DATABASE_URL is provided (for Neon integration)
+    database_url = os.getenv("DATABASE_URL")
+    
+    if database_url:
+        # Parse the DATABASE_URL
+        parsed = urlparse(database_url)
+        db_host = parsed.hostname
+        db_port = parsed.port or 5432
+        db_name = parsed.path.lstrip('/')
+        db_user = parsed.username
+        db_password = parsed.password
+    else:
+        # Get connection details from individual environment variables or use defaults
+        db_host = os.getenv("DB_HOST", "localhost")
+        db_port = int(os.getenv("DB_PORT", "5432"))
+        db_name = os.getenv("DB_NAME", "demo")
+        db_user = os.getenv("DB_USER", "demo")
+        db_password = os.getenv("DB_PASSWORD", "demo")
     
     for attempt in range(max_retries):
         try:

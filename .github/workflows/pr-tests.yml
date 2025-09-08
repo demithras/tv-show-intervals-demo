@@ -12,8 +12,12 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
 
 permissions:
-  contents: read
+  contents: write
   pull-requests: write
+  checks: write
+  statuses: write
+  pages: write
+  id-token: write
 
 jobs:
   test:
@@ -34,6 +38,11 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y postgresql-client
+          
+          # Install Allure CLI
+          curl -o allure-2.24.0.tgz -Ls https://github.com/allure-framework/allure2/releases/download/2.24.0/allure-2.24.0.tgz
+          sudo tar -zxvf allure-2.24.0.tgz -C /opt/
+          sudo ln -s /opt/allure-2.24.0/bin/allure /usr/bin/allure
 
       - name: Install Python dependencies
         run: |
@@ -48,66 +57,174 @@ jobs:
           branch_name: preview/pr-${{ github.event.number }}
           api_key: ${{ secrets.NEON_API_KEY }}
 
-      - name: Parse database URL
-        id: parse_db_url
-        run: |
-          # Extract connection details from Neon DATABASE_URL
-          DB_URL="${{ steps.create_neon_branch.outputs.db_url_with_pooler }}"
-          
-          # Extract components using parameter expansion
-          # Remove protocol
-          DB_URL_NO_PROTOCOL=${DB_URL#postgresql://}
-          
-          # Extract user:password@host:port/database
-          USER_PASS_HOST_PORT_DB=${DB_URL_NO_PROTOCOL%\?*}
-          
-          # Extract user:password
-          USER_PASS=${USER_PASS_HOST_PORT_DB%@*}
-          
-          # Extract host:port/database
-          HOST_PORT_DB=${USER_PASS_HOST_PORT_DB#*@}
-          
-          # Extract host:port
-          HOST_PORT=${HOST_PORT_DB%/*}
-          
-          # Extract database
-          DATABASE=${HOST_PORT_DB##*/}
-          
-          # Extract user and password
-          USER=${USER_PASS%:*}
-          PASSWORD=${USER_PASS#*:}
-          
-          # Extract host and port
-          HOST=${HOST_PORT%:*}
-          PORT=${HOST_PORT#*:}
-          
-          echo "DB_HOST=${HOST}" >> $GITHUB_OUTPUT
-          echo "DB_PORT=${PORT}" >> $GITHUB_OUTPUT
-          echo "DB_NAME=${DATABASE}" >> $GITHUB_OUTPUT
-          echo "DB_USER=${USER}" >> $GITHUB_OUTPUT
-          echo "DB_PASSWORD=${PASSWORD}" >> $GITHUB_OUTPUT
-
       - name: Run database migrations
         run: |
-          # Apply the schema to the Neon branch database
-          PGPASSWORD="${{ steps.parse_db_url.outputs.DB_PASSWORD }}" psql \
-            -h "${{ steps.parse_db_url.outputs.DB_HOST }}" \
-            -p "${{ steps.parse_db_url.outputs.DB_PORT }}" \
-            -U "${{ steps.parse_db_url.outputs.DB_USER }}" \
-            -d "${{ steps.parse_db_url.outputs.DB_NAME }}" \
-            -f schema.sql
+          # Apply the schema to the Neon branch database using the full connection URL
+          psql "${{ steps.create_neon_branch.outputs.db_url_with_pooler }}" -f schema.sql
 
       - name: Run BDD tests
         env:
-          # Override test database connection to use Neon branch
-          DB_HOST: ${{ steps.parse_db_url.outputs.DB_HOST }}
-          DB_PORT: ${{ steps.parse_db_url.outputs.DB_PORT }}
-          DB_NAME: ${{ steps.parse_db_url.outputs.DB_NAME }}
-          DB_USER: ${{ steps.parse_db_url.outputs.DB_USER }}
-          DB_PASSWORD: ${{ steps.parse_db_url.outputs.DB_PASSWORD }}
+          # Use the full database URL for Python connection
+          DATABASE_URL: ${{ steps.create_neon_branch.outputs.db_url_with_pooler }}
         run: |
-          # Run pytest with BDD tests
-          pytest -v --tb=short --junitxml=test-results.xml
+          # Run pytest with BDD tests and generate both JUnit XML and Allure reports
+          pytest -v --tb=short \
+            --junitxml=test-results.xml \
+            --alluredir=allure-results \
+            --allure-link-pattern=issue:https://github.com/${{ github.repository }}/issues/{} \
+            --allure-link-pattern=test_case:https://github.com/${{ github.repository }}/blob/${{ github.sha }}/features/{}
+
+      - name: Download previous Allure history
+        if: always()
+        continue-on-error: true
+        run: |
+          # Create allure-results directory if it doesn't exist
+          mkdir -p allure-results
+          
+          # Try to download previous Allure history from GitHub Pages
+          echo "🔍 Checking for previous test history..."
+          
+          # Download the previous allure report to extract history
+          if curl -f -s "https://demithras.github.io/tv-show-intervals-demo/pr-${{ github.event.number }}/history/history.json" -o /tmp/history.json; then
+            echo "✅ Found previous history.json"
+            mkdir -p allure-results/history
+            
+            # Download all history files
+            curl -f -s "https://demithras.github.io/tv-show-intervals-demo/pr-${{ github.event.number }}/history/history.json" -o allure-results/history/history.json || true
+            curl -f -s "https://demithras.github.io/tv-show-intervals-demo/pr-${{ github.event.number }}/history/history-trend.json" -o allure-results/history/history-trend.json || true
+            curl -f -s "https://demithras.github.io/tv-show-intervals-demo/pr-${{ github.event.number }}/history/duration-trend.json" -o allure-results/history/duration-trend.json || true
+            curl -f -s "https://demithras.github.io/tv-show-intervals-demo/pr-${{ github.event.number }}/history/retry-trend.json" -o allure-results/history/retry-trend.json || true
+            curl -f -s "https://demithras.github.io/tv-show-intervals-demo/pr-${{ github.event.number }}/history/categories-trend.json" -o allure-results/history/categories-trend.json || true
+            
+            echo "✅ Previous test history restored"
+            ls -la allure-results/history/ || true
+          else
+            echo "ℹ️ No previous history found - this will be the first run for trend analysis"
+          fi
+
+      - name: Generate Allure Report with History
+        if: always()
+        run: |
+          # Generate Allure HTML report with history (don't use --clean to preserve history)
+          echo "📊 Generating Allure report with test-level history..."
+          allure generate allure-results -o allure-report
+          
+          # Verify history was properly integrated
+          if [ -f "allure-report/history/history.json" ]; then
+            echo "✅ Test history successfully integrated into report"
+            echo "📈 History file size: $(wc -c < allure-report/history/history.json) bytes"
+          else
+            echo "ℹ️ No history file in generated report (first run)"
+          fi
+          
+          # Add environment information with more details
+          cat > allure-report/environment.properties << EOF
+          Database.Host=${{ steps.create_neon_branch.outputs.db_url_with_pooler }}
+          Python.Version=3.11
+          Test.Framework=pytest-bdd
+          CI.Provider=GitHub Actions
+          PR.Number=${{ github.event.number }}
+          Branch.Name=${{ github.head_ref }}
+          Commit.SHA=${{ github.sha }}
+          Run.Number=${{ github.run_number }}
+          Run.Attempt=${{ github.run_attempt }}
+          Timestamp=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          Repository=${{ github.repository }}
+          EOF
+          
+          # Add test execution metadata for better history tracking
+          if [ -f "allure-report/widgets/summary.json" ]; then
+            echo "📊 Test summary available for trend analysis"
+          fi
+          
+          echo "✅ Allure report generated with per-test history tracking"
+
+      - name: Upload Allure Results with History
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: allure-results-pr-${{ github.event.number }}-run-${{ github.run_number }}
+          path: allure-results/
+          retention-days: 30
+
+      - name: Upload Allure Report with History
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: allure-report-pr-${{ github.event.number }}-run-${{ github.run_number }}
+          path: allure-report/
+          retention-days: 30
+
+      - name: Deploy Allure Report to GitHub Pages
+        if: always()
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./allure-report
+          destination_dir: pr-${{ github.event.number }}
+          keep_files: true
+          force_orphan: false
+          user_name: 'github-actions[bot]'
+          user_email: 'github-actions[bot]@users.noreply.github.com'
+          commit_message: 'Deploy Allure report for PR #${{ github.event.number }} (Run #${{ github.run_number }})'
+
+      - name: Generate Global History Report
+        if: always() && github.event.action != 'closed'
+        run: |
+          # Create a global history index page
+          mkdir -p global-history
+          
+          cat > global-history/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <title>Test History - TV Show Intervals Demo</title>
+              <style>
+                  body { font-family: Arial, sans-serif; margin: 40px; }
+                  .header { background: #f5f5f5; padding: 20px; border-radius: 8px; margin-bottom: 30px; }
+                  .pr-link { display: block; padding: 10px; margin: 5px 0; background: #e8f4fd; border-left: 4px solid #0366d6; text-decoration: none; color: #0366d6; border-radius: 4px; }
+                  .pr-link:hover { background: #cce8ff; }
+                  .timestamp { color: #666; font-size: 0.9em; }
+              </style>
+          </head>
+          <body>
+              <div class="header">
+                  <h1>🧪 TV Show Intervals Demo - Test History</h1>
+                  <p>Browse Allure test reports for all pull requests</p>
+              </div>
+              
+              <h2>📊 Available Test Reports</h2>
+              <div id="reports">
+                  <a href="pr-${{ github.event.number }}/" class="pr-link">
+                      📋 PR #${{ github.event.number }} - Latest Run
+                      <div class="timestamp">Run #${{ github.run_number }} • ${{ github.head_ref }} • $(date -u +"%Y-%m-%d %H:%M UTC")</div>
+                  </a>
+              </div>
+              
+              <h2>🔍 Report Features</h2>
+              <ul>
+                  <li>📈 <strong>Trends</strong>: Test execution history and performance over time</li>
+                  <li>🎯 <strong>BDD Scenarios</strong>: Gherkin features with step-by-step execution</li>
+                  <li>📊 <strong>Analytics</strong>: Test distribution, timing, and failure analysis</li>
+                  <li>📎 <strong>Attachments</strong>: Database queries, program data, and debug info</li>
+                  <li>🏷️ <strong>Categories</strong>: Organized by features and test types</li>
+              </ul>
+          </body>
+          </html>
+          EOF
+
+      - name: Deploy Global History Index
+        if: always() && github.event.action != 'closed'
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./global-history
+          destination_dir: .
+          keep_files: true
+          force_orphan: false
+          user_name: 'github-actions[bot]'
+          user_email: 'github-actions[bot]@users.noreply.github.com'
+          commit_message: 'Update global test history index'
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
@@ -119,10 +236,157 @@ jobs:
       - name: Comment test results on PR
         uses: dorny/test-reporter@v1
         if: always()
+        continue-on-error: true
         with:
-          name: BDD Test Results
+          name: BDD Test Results (Run #${{ github.run_number }})
           path: test-results.xml
           reporter: java-junit
+          fail-on-error: false
+
+      - name: Parse and comment test results with Allure link
+        if: always()
+        run: |
+          echo "🔍 Starting test results parsing and comment generation..."
+          
+          # Initialize variables with defaults
+          TOTAL_TESTS=0
+          FAILURES=0
+          ERRORS=0
+          PASSED=0
+          
+          if [ -f test-results.xml ]; then
+            echo "✅ Found test-results.xml, parsing..."
+            
+            # Extract test summary from JUnit XML with better error handling
+            TOTAL_TESTS=$(grep -o 'tests="[^"]*"' test-results.xml | grep -o '[0-9]*' | head -1 || echo "0")
+            FAILURES=$(grep -o 'failures="[^"]*"' test-results.xml | grep -o '[0-9]*' | head -1 || echo "0")
+            ERRORS=$(grep -o 'errors="[^"]*"' test-results.xml | grep -o '[0-9]*' | head -1 || echo "0")
+            
+            # Ensure all values are numeric
+            TOTAL_TESTS=${TOTAL_TESTS:-0}
+            FAILURES=${FAILURES:-0}
+            ERRORS=${ERRORS:-0}
+            
+            PASSED=$((TOTAL_TESTS - FAILURES - ERRORS))
+            
+            echo "📊 Test summary: Total=$TOTAL_TESTS, Passed=$PASSED, Failed=$FAILURES, Errors=$ERRORS"
+          else
+            echo "⚠️ No test-results.xml found - using default values"
+          fi
+          
+          # Determine status and appropriate messaging
+          if [ $FAILURES -gt 0 ] || [ $ERRORS -gt 0 ]; then
+            STATUS="❌ Tests failed"
+            STATUS_EMOJI="❌"
+            ADDITIONAL_TEXT="**⚠️ Some tests are failing** - Check the detailed report below for more information."
+          else
+            STATUS="✅ All tests passed"
+            STATUS_EMOJI="✅"
+            ADDITIONAL_TEXT="**🎉 Great job!** All tests are passing successfully."
+          fi
+          
+          # GitHub Pages URLs
+          ALLURE_URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/pr-${{ github.event.number }}"
+          HISTORY_URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
+          
+          echo "🔗 Allure report URL: $ALLURE_URL"
+          
+          # Create robust comment body
+          cat > comment-payload.json << EOF
+          {
+            "body": "## 🧪 BDD Test Results (Run #${{ github.run_number }})\n\n${STATUS_EMOJI} **Status:** ${STATUS}\n\n### 📊 Test Summary\n\n| Result | Count |\n|--------|-------|\n| ✅ Passed | ${PASSED} |\n| ❌ Failed | ${FAILURES} |\n| 🔥 Errors | ${ERRORS} |\n| 📊 **Total** | **${TOTAL_TESTS}** |\n\n${ADDITIONAL_TEXT}\n\n### 📊 Interactive Reports\n\n- 🎯 **[View Latest Allure Report](${ALLURE_URL})** - Full test results with history trends\n- 📈 **[Browse All Test History](${HISTORY_URL})** - Historical reports across all PRs\n- 📁 **[Download Test Artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})** - Raw results and logs\n\n### 📈 Available Report Features\n\n- **🔄 Trends**: Performance and stability over time\n- **🔁 Retries**: Flaky test detection and analysis  \n- **⏱️ Duration**: Execution time trends and bottlenecks\n- **📂 Categories**: Failure pattern analysis\n- **📎 Attachments**: Database queries, program data, and debug info\n\n---\n*🤖 Automated comment generated by GitHub Actions • Run #${{ github.run_number }} • $(date -u +\"%Y-%m-%d %H:%M UTC\")*"
+          }
+          EOF
+          
+          echo "📝 Generated comment payload"
+          
+          # Post comment using GitHub API with improved error handling
+          echo "🚀 Posting comment to PR #${{ github.event.number }}..."
+          
+          HTTP_STATUS=$(curl -w "%{http_code}" -s -o response.json \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/issues/${{ github.event.number }}/comments" \
+            -d @comment-payload.json)
+          
+          echo "📡 HTTP Status: $HTTP_STATUS"
+          
+          if [ "$HTTP_STATUS" -eq 201 ]; then
+            echo "✅ Successfully posted test results comment to PR #${{ github.event.number }}"
+            echo "🔗 Allure report will be available at: ${ALLURE_URL}"
+          else
+            echo "❌ Failed to post comment. HTTP Status: $HTTP_STATUS"
+            echo "📄 Response:"
+            cat response.json || echo "No response file found"
+            
+            # Try to extract error message
+            if [ -f response.json ]; then
+              ERROR_MSG=$(grep -o '"message":"[^"]*"' response.json | cut -d'"' -f4 || echo "Unknown error")
+              echo "🚨 Error message: $ERROR_MSG"
+            fi
+            
+            # Don't fail the entire job - just log the error
+            echo "⚠️ Comment posting failed, but continuing workflow..."
+          fi
+          
+          # Clean up
+          rm -f comment-payload.json response.json || true
+          
+          echo "🏁 Test results parsing and comment generation completed"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Fallback comment if previous steps failed
+        if: always()
+        continue-on-error: true
+        run: |
+          echo "🔄 Running fallback comment check..."
+          
+          # Check if we should post a fallback comment
+          # This will only run if the main comment step somehow failed
+          
+          # Get workflow status
+          WORKFLOW_STATUS="${{ job.status }}"
+          
+          # GitHub Pages URLs
+          ALLURE_URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/pr-${{ github.event.number }}"
+          HISTORY_URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
+          
+          # Create fallback comment
+          cat > fallback-comment.json << EOF
+          {
+            "body": "## 🧪 BDD Test Results (Run #${{ github.run_number }}) - Fallback Report\n\n⚠️ **Unable to parse detailed test results**, but the test execution completed.\n\n**Workflow Status:** ${WORKFLOW_STATUS}\n\n### 📊 Available Reports\n\n- 🎯 **[View Allure Report](${ALLURE_URL})** - Full test results with detailed information\n- 📈 **[Browse Test History](${HISTORY_URL})** - Historical reports across all PRs\n- 📁 **[Download Test Artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})** - Raw results and logs\n\n### 🔍 What to check\n\n1. **Allure Report**: Click the link above for the most complete test results\n2. **Workflow Logs**: Check the [GitHub Actions logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) for detailed execution information\n3. **Test Artifacts**: Download the test results and reports from the artifacts section\n\n---\n*🤖 Fallback comment generated by GitHub Actions • Run #${{ github.run_number }} • $(date -u +\"%Y-%m-%d %H:%M UTC\")*"
+          }
+          EOF
+          
+          echo "📝 Posting fallback comment as backup..."
+          
+          # Only post fallback if no recent comment exists
+          RECENT_COMMENTS=$(curl -s \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/issues/${{ github.event.number }}/comments?per_page=5" | \
+            grep -c "BDD Test Results (Run #${{ github.run_number }})" || echo "0")
+          
+          if [ "$RECENT_COMMENTS" -eq 0 ]; then
+            echo "📤 No recent test result comment found, posting fallback..."
+            curl -s \
+              -X POST \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer $GITHUB_TOKEN" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/$GITHUB_REPOSITORY/issues/${{ github.event.number }}/comments" \
+              -d @fallback-comment.json > /dev/null
+            echo "✅ Fallback comment posted"
+          else
+            echo "✅ Main test comment already posted, skipping fallback"
+          fi
+          
+          rm -f fallback-comment.json || true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   cleanup:
     name: Delete Neon Branch
