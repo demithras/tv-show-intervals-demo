@@ -78,34 +78,46 @@ jobs:
         if: always()
         continue-on-error: true
         run: |
+          # Create allure-results directory if it doesn't exist
+          mkdir -p allure-results
+          
           # Try to download previous Allure history from GitHub Pages
-          mkdir -p allure-results/history
+          echo "🔍 Checking for previous test history..."
           
-          # Download history from the existing gh-pages branch if it exists
-          curl -f -o history.tar.gz "https://demithras.github.io/tv-show-intervals-demo/pr-${{ github.event.number }}/history.tar.gz" 2>/dev/null || echo "No previous history found"
-          
-          if [ -f history.tar.gz ]; then
-            tar -xzf history.tar.gz -C allure-results/
-            echo "✅ Previous history restored"
+          # Download the previous allure report to extract history
+          if curl -f -s "https://demithras.github.io/tv-show-intervals-demo/pr-${{ github.event.number }}/history/history.json" -o /tmp/history.json; then
+            echo "✅ Found previous history.json"
+            mkdir -p allure-results/history
+            
+            # Download all history files
+            curl -f -s "https://demithras.github.io/tv-show-intervals-demo/pr-${{ github.event.number }}/history/history.json" -o allure-results/history/history.json || true
+            curl -f -s "https://demithras.github.io/tv-show-intervals-demo/pr-${{ github.event.number }}/history/history-trend.json" -o allure-results/history/history-trend.json || true
+            curl -f -s "https://demithras.github.io/tv-show-intervals-demo/pr-${{ github.event.number }}/history/duration-trend.json" -o allure-results/history/duration-trend.json || true
+            curl -f -s "https://demithras.github.io/tv-show-intervals-demo/pr-${{ github.event.number }}/history/retry-trend.json" -o allure-results/history/retry-trend.json || true
+            curl -f -s "https://demithras.github.io/tv-show-intervals-demo/pr-${{ github.event.number }}/history/categories-trend.json" -o allure-results/history/categories-trend.json || true
+            
+            echo "✅ Previous test history restored"
+            ls -la allure-results/history/ || true
           else
-            echo "ℹ️ No previous history found - starting fresh"
+            echo "ℹ️ No previous history found - this will be the first run for trend analysis"
           fi
 
       - name: Generate Allure Report with History
         if: always()
         run: |
-          # Generate Allure HTML report with history
-          allure generate allure-results --clean -o allure-report
+          # Generate Allure HTML report with history (don't use --clean to preserve history)
+          echo "📊 Generating Allure report with test-level history..."
+          allure generate allure-results -o allure-report
           
-          # Create history archive for next run
-          if [ -d "allure-report/history" ]; then
-            cd allure-report
-            tar -czf history.tar.gz history/
-            cd ..
-            echo "✅ History archived for future runs"
+          # Verify history was properly integrated
+          if [ -f "allure-report/history/history.json" ]; then
+            echo "✅ Test history successfully integrated into report"
+            echo "📈 History file size: $(wc -c < allure-report/history/history.json) bytes"
+          else
+            echo "ℹ️ No history file in generated report (first run)"
           fi
           
-          # Add environment information
+          # Add environment information with more details
           cat > allure-report/environment.properties << EOF
           Database.Host=${{ steps.create_neon_branch.outputs.db_url_with_pooler }}
           Python.Version=3.11
@@ -116,10 +128,16 @@ jobs:
           Commit.SHA=${{ github.sha }}
           Run.Number=${{ github.run_number }}
           Run.Attempt=${{ github.run_attempt }}
+          Timestamp=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          Repository=${{ github.repository }}
           EOF
           
-          # Add trend data
-          echo "✅ Allure report generated with history trends"
+          # Add test execution metadata for better history tracking
+          if [ -f "allure-report/widgets/summary.json" ]; then
+            echo "📊 Test summary available for trend analysis"
+          fi
+          
+          echo "✅ Allure report generated with per-test history tracking"
 
       - name: Upload Allure Results with History
         uses: actions/upload-artifact@v4

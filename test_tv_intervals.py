@@ -5,6 +5,7 @@ Implements the Gherkin scenarios for pytest-bdd with Allure reporting.
 
 import pytest
 import allure
+import hashlib
 from pytest_bdd import scenarios, given, when, then, parsers
 from conftest import get_program_intervals, get_programs, insert_program
 
@@ -13,11 +14,27 @@ from conftest import get_program_intervals, get_programs, insert_program
 scenarios('features/tv_intervals.feature')
 
 
+def generate_test_id(scenario_name):
+    """Generate consistent test ID for history tracking"""
+    return hashlib.md5(scenario_name.encode()).hexdigest()[:16]
+
+
 # Test context to store program data between steps
 @pytest.fixture
 def test_context():
     """Fixture to maintain test context between steps."""
     return {}
+
+
+@pytest.fixture(autouse=True)
+def setup_allure_test_id(request):
+    """Automatically set consistent test IDs for Allure history tracking"""
+    if hasattr(request.node, 'scenario'):
+        scenario_name = request.node.scenario['name']
+        test_id = generate_test_id(scenario_name)
+        allure.dynamic.testcase_id(test_id)
+        allure.dynamic.label("testType", "BDD")
+        allure.dynamic.label("framework", "pytest-bdd")
 
 
 # Given steps
