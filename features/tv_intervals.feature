@@ -163,3 +163,9 @@ Feature: TV Program 15-Minute Interval Calculation
       | Edge Case 7       | 2         |
       | Edge Case 8       | 3         |
       | Edge Case 9       | 3         |
+
+  # Test scenario for CI/CD validation - will be temporarily modified for testing
+  Scenario: CI/CD Test Scenario - Validate comment posting
+    Given I have a program "CI Test Program" that runs from "10:00" to "10:30"
+    When I insert the program into the database
+    Then the program "CI Test Program" should have 2 intervals
