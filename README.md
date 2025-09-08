@@ -214,20 +214,66 @@ VALUES ('News Brief', '12:00', '12:10');
 -- Result: 10 minutes < 15 minutes = 0 intervals
 ```
 
-## Cleanup
+## GitHub Actions CI/CD
 
-Stop and remove the database:
+This project includes a GitHub Action that automatically tests database changes on pull requests using Neon database branches.
+
+### Setup with Neon GitHub App (Recommended)
+
+Since you have the Neon GitHub App installed, setup is simplified:
+
+1. **Configure the GitHub App**:
+   - Click "Configure" on your Neon GitHub App
+   - Select your repository and grant necessary permissions
+   - The app will automatically provide the required credentials
+
+2. **Add Repository Variables**:
+   - Go to your repository → Settings → Secrets and variables → Actions
+   - Add these **Repository Variables**:
+     - `NEON_PROJECT_ID`: Your Neon project ID
+   - Add this **Repository Secret**:
+     - `NEON_API_KEY`: Your Neon API key (if not auto-configured by the app)
+
+### Alternative Manual Setup
+
+If you prefer manual setup or don't use the GitHub App:
+
+1. **Neon Account**: Create a Neon account and project at [neon.tech](https://neon.tech)
+2. **GitHub Repository Variables**: Add `NEON_PROJECT_ID`
+3. **GitHub Repository Secrets**: Add `NEON_API_KEY`
+
+Run `./github-setup.sh` for detailed manual setup instructions.
+
+### How It Works
+
+The GitHub Action (`.github/workflows/pr-tests.yml`) automatically:
+
+1. **On PR Open/Update**:
+   - Creates a new Neon database branch for the PR
+   - Applies the schema to the new branch
+   - Runs all BDD tests against the isolated database
+   - Posts test results as PR comments
+
+2. **On PR Close**:
+   - Automatically deletes the Neon database branch
+
+### Benefits
+
+- ✅ **Isolated Testing**: Each PR gets its own database branch
+- ✅ **Automatic Setup**: GitHub App handles most configuration
+- ✅ **Test Results**: Formatted test results in PR comments
+- ✅ **Cost Effective**: Branches are automatically cleaned up
+- ✅ **No Local DB Required**: Tests run entirely in the cloud
+
+### Manual Testing
+
+You can still run tests locally using Docker:
 
 ```bash
-docker-compose down -v
+./setup.sh
 ```
 
-Remove Python virtual environment:
-
-```bash
-deactivate  # If virtual environment is active
-rm -rf venv
-```
+This uses the local PostgreSQL container defined in `docker-compose.yml`.
 
 ## Technical Details
 

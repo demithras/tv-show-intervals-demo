@@ -1,0 +1,137 @@
+name: PR Database Tests
+
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - closed
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  test:
+    name: Run BDD Tests
+    if: github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Create Neon Branch
+        id: create_neon_branch
+        uses: neondatabase/create-branch-action@v5
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch_name: preview/pr-${{ github.event.number }}
+          api_key: ${{ secrets.NEON_API_KEY }}
+
+      - name: Parse database URL
+        id: parse_db_url
+        run: |
+          # Extract connection details from Neon DATABASE_URL
+          DB_URL="${{ steps.create_neon_branch.outputs.db_url_with_pooler }}"
+          
+          # Extract components using parameter expansion
+          # Remove protocol
+          DB_URL_NO_PROTOCOL=${DB_URL#postgresql://}
+          
+          # Extract user:password@host:port/database
+          USER_PASS_HOST_PORT_DB=${DB_URL_NO_PROTOCOL%\?*}
+          
+          # Extract user:password
+          USER_PASS=${USER_PASS_HOST_PORT_DB%@*}
+          
+          # Extract host:port/database
+          HOST_PORT_DB=${USER_PASS_HOST_PORT_DB#*@}
+          
+          # Extract host:port
+          HOST_PORT=${HOST_PORT_DB%/*}
+          
+          # Extract database
+          DATABASE=${HOST_PORT_DB##*/}
+          
+          # Extract user and password
+          USER=${USER_PASS%:*}
+          PASSWORD=${USER_PASS#*:}
+          
+          # Extract host and port
+          HOST=${HOST_PORT%:*}
+          PORT=${HOST_PORT#*:}
+          
+          echo "DB_HOST=${HOST}" >> $GITHUB_OUTPUT
+          echo "DB_PORT=${PORT}" >> $GITHUB_OUTPUT
+          echo "DB_NAME=${DATABASE}" >> $GITHUB_OUTPUT
+          echo "DB_USER=${USER}" >> $GITHUB_OUTPUT
+          echo "DB_PASSWORD=${PASSWORD}" >> $GITHUB_OUTPUT
+
+      - name: Run database migrations
+        run: |
+          # Apply the schema to the Neon branch database
+          PGPASSWORD="${{ steps.parse_db_url.outputs.DB_PASSWORD }}" psql \
+            -h "${{ steps.parse_db_url.outputs.DB_HOST }}" \
+            -p "${{ steps.parse_db_url.outputs.DB_PORT }}" \
+            -U "${{ steps.parse_db_url.outputs.DB_USER }}" \
+            -d "${{ steps.parse_db_url.outputs.DB_NAME }}" \
+            -f schema.sql
+
+      - name: Run BDD tests
+        env:
+          # Override test database connection to use Neon branch
+          DB_HOST: ${{ steps.parse_db_url.outputs.DB_HOST }}
+          DB_PORT: ${{ steps.parse_db_url.outputs.DB_PORT }}
+          DB_NAME: ${{ steps.parse_db_url.outputs.DB_NAME }}
+          DB_USER: ${{ steps.parse_db_url.outputs.DB_USER }}
+          DB_PASSWORD: ${{ steps.parse_db_url.outputs.DB_PASSWORD }}
+        run: |
+          # Run pytest with BDD tests
+          pytest -v --tb=short --junitxml=test-results.xml
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-pr-${{ github.event.number }}
+          path: test-results.xml
+
+      - name: Comment test results on PR
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: BDD Test Results
+          path: test-results.xml
+          reporter: java-junit
+
+  cleanup:
+    name: Delete Neon Branch
+    if: github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete Neon Branch
+        uses: neondatabase/delete-branch-action@v3
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch: preview/pr-${{ github.event.number }}
+          api_key: ${{ secrets.NEON_API_KEY }}

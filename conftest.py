@@ -7,6 +7,7 @@ import pytest
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import time
+import os
 
 
 @pytest.fixture(scope="session")
@@ -14,19 +15,28 @@ def db_connection():
     """
     Create a database connection for the test session.
     Retries connection in case the database is still starting up.
+    Uses environment variables for connection details if available,
+    otherwise falls back to local defaults.
     """
     connection = None
     max_retries = 10
     retry_delay = 2
     
+    # Get connection details from environment or use defaults
+    db_host = os.getenv("DB_HOST", "localhost")
+    db_port = int(os.getenv("DB_PORT", "5432"))
+    db_name = os.getenv("DB_NAME", "demo")
+    db_user = os.getenv("DB_USER", "demo")
+    db_password = os.getenv("DB_PASSWORD", "demo")
+    
     for attempt in range(max_retries):
         try:
             connection = psycopg2.connect(
-                host="localhost",
-                database="demo",
-                user="demo", 
-                password="demo",
-                port=5432,
+                host=db_host,
+                database=db_name,
+                user=db_user, 
+                password=db_password,
+                port=db_port,
                 cursor_factory=RealDictCursor
             )
             # Set to autocommit mode to avoid transaction issues
