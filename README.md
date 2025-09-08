@@ -267,7 +267,7 @@ The GitHub Action (`.github/workflows/pr-tests.yml`) automatically:
 - ✅ **Cost Effective**: Branches are automatically cleaned up
 - ✅ **No Local DB Required**: Tests run entirely in the cloud
 
-### Allure Reports
+### Allure Reports with History
 
 The workflow generates comprehensive Allure reports that include:
 
@@ -276,12 +276,30 @@ The workflow generates comprehensive Allure reports that include:
 - 📋 **Test Steps**: Granular step-by-step execution details
 - 📎 **Attachments**: Database queries, program data, and debug info
 - 🏷️ **Categories**: Organized by features, stories, and test types
-- 📈 **History**: Test execution trends across PR runs
+- 📈 **History & Trends**: Cross-run analysis and performance tracking
+
+#### 🔄 **History Management:**
+
+**Per-PR History:**
+- Each PR maintains its own test execution history
+- Multiple runs on the same PR show trends over time
+- History preserved between synchronize events (new commits)
+
+**Global History:**
+- Browse reports from all PRs at the main GitHub Pages URL
+- Compare test performance across different branches
+- Track overall project test health
+
+**Trend Analytics:**
+- ⏱️ **Duration Trends**: Test execution time changes
+- 🔄 **Retry Trends**: Flaky test detection over time  
+- 📊 **History Trends**: Pass/fail rates across runs
+- 📈 **Categories Trends**: Failure pattern analysis
 
 **Accessing Reports:**
-- Click the Allure Report link in PR comments
-- Visit: `https://your-username.github.io/your-repo-name/pr-{number}`
-- Download artifacts from GitHub Actions run page
+- **Latest PR Report**: `https://your-username.github.io/repo-name/pr-{number}`
+- **Global History Index**: `https://your-username.github.io/repo-name/`
+- **Artifacts**: Available in GitHub Actions run page for 30 days
 
 ### Manual Testing
 

@@ -74,11 +74,36 @@ jobs:
             --allure-link-pattern=issue:https://github.com/${{ github.repository }}/issues/{} \
             --allure-link-pattern=test_case:https://github.com/${{ github.repository }}/blob/${{ github.sha }}/features/{}
 
-      - name: Generate Allure Report
+      - name: Download previous Allure history
+        if: always()
+        continue-on-error: true
+        run: |
+          # Try to download previous Allure history from GitHub Pages
+          mkdir -p allure-results/history
+          
+          # Download history from the existing gh-pages branch if it exists
+          curl -f -o history.tar.gz "https://demithras.github.io/tv-show-intervals-demo/pr-${{ github.event.number }}/history.tar.gz" 2>/dev/null || echo "No previous history found"
+          
+          if [ -f history.tar.gz ]; then
+            tar -xzf history.tar.gz -C allure-results/
+            echo "✅ Previous history restored"
+          else
+            echo "ℹ️ No previous history found - starting fresh"
+          fi
+
+      - name: Generate Allure Report with History
         if: always()
         run: |
-          # Generate Allure HTML report
+          # Generate Allure HTML report with history
           allure generate allure-results --clean -o allure-report
+          
+          # Create history archive for next run
+          if [ -d "allure-report/history" ]; then
+            cd allure-report
+            tar -czf history.tar.gz history/
+            cd ..
+            echo "✅ History archived for future runs"
+          fi
           
           # Add environment information
           cat > allure-report/environment.properties << EOF
@@ -89,21 +114,26 @@ jobs:
           PR.Number=${{ github.event.number }}
           Branch.Name=${{ github.head_ref }}
           Commit.SHA=${{ github.sha }}
+          Run.Number=${{ github.run_number }}
+          Run.Attempt=${{ github.run_attempt }}
           EOF
+          
+          # Add trend data
+          echo "✅ Allure report generated with history trends"
 
-      - name: Upload Allure Results
+      - name: Upload Allure Results with History
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: allure-results-pr-${{ github.event.number }}
+          name: allure-results-pr-${{ github.event.number }}-run-${{ github.run_number }}
           path: allure-results/
           retention-days: 30
 
-      - name: Upload Allure Report
+      - name: Upload Allure Report with History
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: allure-report-pr-${{ github.event.number }}
+          name: allure-report-pr-${{ github.event.number }}-run-${{ github.run_number }}
           path: allure-report/
           retention-days: 30
 
@@ -118,7 +148,65 @@ jobs:
           force_orphan: false
           user_name: 'github-actions[bot]'
           user_email: 'github-actions[bot]@users.noreply.github.com'
-          commit_message: 'Deploy Allure report for PR #${{ github.event.number }}'
+          commit_message: 'Deploy Allure report for PR #${{ github.event.number }} (Run #${{ github.run_number }})'
+
+      - name: Generate Global History Report
+        if: always() && github.event.action != 'closed'
+        run: |
+          # Create a global history index page
+          mkdir -p global-history
+          
+          cat > global-history/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <title>Test History - TV Show Intervals Demo</title>
+              <style>
+                  body { font-family: Arial, sans-serif; margin: 40px; }
+                  .header { background: #f5f5f5; padding: 20px; border-radius: 8px; margin-bottom: 30px; }
+                  .pr-link { display: block; padding: 10px; margin: 5px 0; background: #e8f4fd; border-left: 4px solid #0366d6; text-decoration: none; color: #0366d6; border-radius: 4px; }
+                  .pr-link:hover { background: #cce8ff; }
+                  .timestamp { color: #666; font-size: 0.9em; }
+              </style>
+          </head>
+          <body>
+              <div class="header">
+                  <h1>🧪 TV Show Intervals Demo - Test History</h1>
+                  <p>Browse Allure test reports for all pull requests</p>
+              </div>
+              
+              <h2>📊 Available Test Reports</h2>
+              <div id="reports">
+                  <a href="pr-${{ github.event.number }}/" class="pr-link">
+                      📋 PR #${{ github.event.number }} - Latest Run
+                      <div class="timestamp">Run #${{ github.run_number }} • ${{ github.head_ref }} • $(date -u +"%Y-%m-%d %H:%M UTC")</div>
+                  </a>
+              </div>
+              
+              <h2>🔍 Report Features</h2>
+              <ul>
+                  <li>📈 <strong>Trends</strong>: Test execution history and performance over time</li>
+                  <li>🎯 <strong>BDD Scenarios</strong>: Gherkin features with step-by-step execution</li>
+                  <li>📊 <strong>Analytics</strong>: Test distribution, timing, and failure analysis</li>
+                  <li>📎 <strong>Attachments</strong>: Database queries, program data, and debug info</li>
+                  <li>🏷️ <strong>Categories</strong>: Organized by features and test types</li>
+              </ul>
+          </body>
+          </html>
+          EOF
+
+      - name: Deploy Global History Index
+        if: always() && github.event.action != 'closed'
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./global-history
+          destination_dir: .
+          keep_files: true
+          force_orphan: false
+          user_name: 'github-actions[bot]'
+          user_email: 'github-actions[bot]@users.noreply.github.com'
+          commit_message: 'Update global test history index'
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
@@ -163,11 +251,12 @@ jobs:
             
             # GitHub Pages URL for Allure report
             ALLURE_URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/pr-${{ github.event.number }}"
+            HISTORY_URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
             
             # Create comment body as JSON for API
             cat > comment-payload.json << EOF
           {
-            "body": "## 🧪 BDD Test Results\n\n**Summary:**\n- ✅ **Passed:** ${PASSED}\n- ❌ **Failed:** ${FAILURES}\n- 🔥 **Errors:** ${ERRORS}\n- 📊 **Total:** ${TOTAL_TESTS}\n\n**Status:** ${STATUS}\n\n${ADDITIONAL_TEXT}\n\n## 📊 Detailed Reports\n\n- 🎯 **[View Allure Report](${ALLURE_URL})** - Interactive test report with detailed analytics\n- 📁 **[Download Test Artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})** - Raw test results and logs\n\n<details>\n<summary>🔍 View JUnit XML summary</summary>\n\n\`\`\`xml\n$(cat test-results.xml | head -20 | sed 's/"/\\"/g')\n\`\`\`\n\n</details>"
+            "body": "## 🧪 BDD Test Results (Run #${{ github.run_number }})\n\n**Summary:**\n- ✅ **Passed:** ${PASSED}\n- ❌ **Failed:** ${FAILURES}\n- 🔥 **Errors:** ${ERRORS}\n- 📊 **Total:** ${TOTAL_TESTS}\n\n**Status:** ${STATUS}\n\n${ADDITIONAL_TEXT}\n\n## 📊 Interactive Reports\n\n- 🎯 **[View Latest Allure Report](${ALLURE_URL})** - Full test results with history trends\n- 📈 **[Browse All Test History](${HISTORY_URL})** - Historical reports across all PRs\n- 📁 **[Download Test Artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})** - Raw results and logs\n\n## 📈 History Features\n\n- **Trends**: Performance and stability over time\n- **Retries**: Flaky test detection and analysis  \n- **Duration**: Execution time trends and bottlenecks\n- **Categories**: Failure pattern analysis\n\n<details>\n<summary>🔍 View JUnit XML summary</summary>\n\n\`\`\`xml\n$(cat test-results.xml | head -20 | sed 's/"/\\"/g')\n\`\`\`\n\n</details>"
           }
           EOF
             
