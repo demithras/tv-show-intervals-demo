@@ -1,0 +1,4 @@
+Morning Show: Expected 4, Got 4
+News Brief: Expected 0, Got 0
+Evening Movie: Expected 9, Got 9
+Night Talk: Expected 3, Got 3
