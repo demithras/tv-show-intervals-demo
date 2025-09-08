@@ -14,6 +14,8 @@ concurrency:
 permissions:
   contents: read
   pull-requests: write
+  checks: write
+  statuses: write
 
 jobs:
   test:
@@ -71,10 +73,69 @@ jobs:
       - name: Comment test results on PR
         uses: dorny/test-reporter@v1
         if: always()
+        continue-on-error: true
         with:
           name: BDD Test Results
           path: test-results.xml
           reporter: java-junit
+
+      - name: Parse and comment test results (fallback)
+        if: always()
+        run: |
+          if [ -f test-results.xml ]; then
+            # Extract test summary from JUnit XML
+            TOTAL_TESTS=$(grep -o 'tests="[^"]*"' test-results.xml | grep -o '[0-9]*' | head -1)
+            FAILURES=$(grep -o 'failures="[^"]*"' test-results.xml | grep -o '[0-9]*' | head -1)
+            ERRORS=$(grep -o 'errors="[^"]*"' test-results.xml | grep -o '[0-9]*' | head -1)
+            
+            # Set defaults if not found
+            TOTAL_TESTS=${TOTAL_TESTS:-0}
+            FAILURES=${FAILURES:-0}
+            ERRORS=${ERRORS:-0}
+            
+            PASSED=$((TOTAL_TESTS - FAILURES - ERRORS))
+            
+            # Create comment body
+            cat > test-comment.md << EOF
+          ## 🧪 BDD Test Results
+          
+          **Summary:**
+          - ✅ **Passed:** ${PASSED}
+          - ❌ **Failed:** ${FAILURES}
+          - 🔥 **Errors:** ${ERRORS}
+          - 📊 **Total:** ${TOTAL_TESTS}
+          
+          $(if [ $FAILURES -gt 0 ] || [ $ERRORS -gt 0 ]; then
+            echo "**Status:** ❌ Tests failed"
+            echo ""
+            echo "Some tests are failing. This might be expected if testing the CI/CD pipeline with intentional failures."
+          else
+            echo "**Status:** ✅ All tests passed"
+          fi)
+          
+          <details>
+          <summary>🔍 View detailed results</summary>
+          
+          \`\`\`
+          $(cat test-results.xml | head -50)
+          \`\`\`
+          
+          </details>
+          EOF
+            
+            # Comment on PR using GitHub CLI if available, or skip
+            if command -v gh &> /dev/null; then
+              gh pr comment --body-file test-comment.md
+            else
+              echo "GitHub CLI not available, skipping PR comment"
+              echo "Test results summary:"
+              cat test-comment.md
+            fi
+          else
+            echo "No test results file found"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   cleanup:
     name: Delete Neon Branch
