@@ -24,6 +24,23 @@ jobs:
     name: Run BDD Tests
     if: github.event.action != 'closed'
     runs-on: ubuntu-latest
+    
+    # Use PostgreSQL service container for ephemeral database
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: demo
+          POSTGRES_USER: demo
+          POSTGRES_PASSWORD: demo
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -49,23 +66,15 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Create Neon Branch
-        id: create_neon_branch
-        uses: neondatabase/create-branch-action@v5
-        with:
-          project_id: ${{ vars.NEON_PROJECT_ID }}
-          branch_name: preview/pr-${{ github.event.number }}
-          api_key: ${{ secrets.NEON_API_KEY }}
-
       - name: Run database migrations
         run: |
-          # Apply the schema to the Neon branch database using the full connection URL
-          psql "${{ steps.create_neon_branch.outputs.db_url_with_pooler }}" -f schema.sql
+          # Apply the schema to the ephemeral PostgreSQL database
+          PGPASSWORD=demo psql -h localhost -U demo -d demo -f schema.sql
 
       - name: Run BDD tests
         env:
-          # Use the full database URL for Python connection
-          DATABASE_URL: ${{ steps.create_neon_branch.outputs.db_url_with_pooler }}
+          # Use the ephemeral PostgreSQL database
+          DATABASE_URL: postgresql://demo:demo@localhost:5432/demo
         run: |
           # Run pytest with BDD tests and generate both JUnit XML and Allure reports
           pytest -v --tb=short \
@@ -119,7 +128,9 @@ jobs:
           
           # Add environment information with more details
           cat > allure-report/environment.properties << EOF
-          Database.Host=${{ steps.create_neon_branch.outputs.db_url_with_pooler }}
+          Database.Host=localhost:5432
+          Database.Type=PostgreSQL 15 (Ephemeral)
+          Database.Name=demo
           Python.Version=3.11
           Test.Framework=pytest-bdd
           CI.Provider=GitHub Actions
@@ -387,15 +398,3 @@ jobs:
           rm -f fallback-comment.json || true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  cleanup:
-    name: Delete Neon Branch
-    if: github.event.action == 'closed'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Delete Neon Branch
-        uses: neondatabase/delete-branch-action@v3
-        with:
-          project_id: ${{ vars.NEON_PROJECT_ID }}
-          branch: preview/pr-${{ github.event.number }}
-          api_key: ${{ secrets.NEON_API_KEY }}
