@@ -1,0 +1,3 @@
+Program: Quick News
+Start: 18:00
+End: 18:15
