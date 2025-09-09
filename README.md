@@ -298,8 +298,14 @@ The workflow generates comprehensive Allure reports that include:
 
 **Accessing Reports:**
 - **Latest PR Report**: `https://your-username.github.io/repo-name/pr-{number}`
-- **Global History Index**: `https://your-username.github.io/repo-name/`
+- **Global History Index**: `https://your-username.github.io/repo-name/` - Shows all PR reports with proper timestamps
 - **Artifacts**: Available in GitHub Actions run page for 30 days
+
+**Recent Improvements:**
+- ✅ Fixed global index to show all PR reports (not just the latest one)
+- ✅ Fixed timestamp display issues (was showing raw shell commands)
+- ✅ Enhanced styling and metadata display for better navigation
+- ✅ Automatic discovery of existing PR reports with proper branch/run information
 
 ### Manual Testing
 
