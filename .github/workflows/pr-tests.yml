@@ -62,6 +62,13 @@ jobs:
           # Apply the schema to the Neon branch database using the full connection URL
           psql "${{ steps.create_neon_branch.outputs.db_url_with_pooler }}" -f schema.sql
 
+      - name: Upload corrupted data for integrity testing
+        env:
+          DATABASE_URL: ${{ steps.create_neon_branch.outputs.db_url_with_pooler }}
+        run: |
+          # Upload corrupted data to create integrity issues for testing
+          ./upload_corrupted_data.sh
+
       - name: Run BDD tests
         env:
           # Use the full database URL for Python connection

@@ -1,0 +1,21 @@
+program_name,start_time,end_time
+Morning News,06:00,07:00
+Overlapping Show,06:30,07:30
+Invalid Time Format,25:00,26:00
+,08:00,09:00
+Missing End Time,09:00,
+Negative Duration,10:00,09:30
+Bad Format Time,eleven:thirty,12:00
+Special Characters Show!@#,12:00,13:00
+Very Long Name That Exceeds Normal Database Limits And Should Cause Issues With Storage,13:00,14:00
+NULL Time,NULL,15:00
+Empty Time,,16:00
+Invalid Date Format,2023-01-01 14:00:00,2023-01-01 15:00:00
+Midnight Issue,24:00,01:00
+Duplicate Entry,17:00,18:00
+Duplicate Entry,17:00,18:00
+SQL Injection'; DROP TABLE programs; --,18:00,19:00
+Same Start End Time,20:00,20:00
+Unicode Characters 你好,20:30,21:30
+Future Date Issue,14:00:00.123,15:00:00.456
+Tab	Character	Issue,21:00,22:00
