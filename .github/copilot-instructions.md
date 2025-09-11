@@ -103,3 +103,5 @@ docker-compose exec postgres psql -U demo -d demo
 - `conftest.py` - Database connection patterns and helper functions  
 - `features/tv_intervals.feature` - Comprehensive business requirements and edge cases
 - `test_tv_intervals.py` - BDD implementation patterns and Allure integration
+
+- Do not cimmit anything

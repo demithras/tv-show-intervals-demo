@@ -60,13 +60,19 @@ The test data includes these integrity issues:
 
 ### CI/CD Integration (Neon Database)
 
-The GitHub Actions workflow automatically:
+The data integrity tests run in a **separate GitHub Actions workflow** (`.github/workflows/data-integrity-tests.yml`) that automatically:
 
-1. Creates a Neon database branch for the PR
+1. Creates a dedicated Neon database branch for data integrity testing (`data-integrity/pr-{number}`)
 2. Applies the schema
 3. Uploads corrupted data using `upload_corrupted_data.sh`
-4. Runs BDD validation tests
-5. Generates Allure reports with detailed findings
+4. Runs BDD validation tests specifically for data integrity
+5. Generates separate Allure reports with detailed findings
+6. Posts specialized comments about data integrity validation results
+
+This workflow runs in parallel with the main functional tests, providing:
+- **Isolated Testing**: Separate database branch for integrity testing
+- **Focused Reporting**: Specialized reports for data quality issues
+- **Independent Execution**: Doesn't interfere with functional test results
 
 ### Local Testing
 
@@ -129,14 +135,20 @@ With the corrupted data, tests should show:
 
 ## Integration with Existing Tests
 
-This data integrity testing complements the existing functional tests:
+This data integrity testing runs in a **separate workflow** and complements the existing functional tests:
 
-- **Functional Tests** (`test_tv_intervals.py`): Test program logic with clean data
-- **Integrity Tests** (`test_data_integrity_validation.py`): Validate corrupted data detection
+- **Functional Tests** (`pr-tests.yml` → `test_tv_intervals.py`): Test program logic with clean data
+- **Integrity Tests** (`data-integrity-tests.yml` → `test_data_integrity_validation.py`): Validate corrupted data detection
 
-Both test suites run together in CI/CD to ensure:
-1. Core functionality works correctly
-2. Data quality issues are properly detected
+Both workflows run in parallel on PRs to ensure:
+1. Core functionality works correctly (functional tests)
+2. Data quality issues are properly detected (integrity tests)
+
+Each workflow has its own:
+- Neon database branch
+- Allure reports 
+- GitHub Pages deployment
+- PR comments
 
 ## Development Workflow
 
