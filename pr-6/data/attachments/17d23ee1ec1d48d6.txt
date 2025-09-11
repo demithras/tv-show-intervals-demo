@@ -1,0 +1,3 @@
+Programs with empty names: 1
+Programs with null names: 0
+Empty names: Program with empty name: start=22:00:00, end=00:00:00

@@ -1,0 +1,3 @@
+Interval entries: 18
+With programs: 18
+Orphaned: 0
