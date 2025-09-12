@@ -35,7 +35,7 @@ SELECT 'Timestamp: ' || CURRENT_TIMESTAMP::text as info;
 \echo ''
 
 -- Run the main data integrity test suite
-\i tests/data_integrity_tests.sql
+\i /app/tests/data_integrity_tests.sql
 
 \echo ''
 \echo 'Test Execution Summary:'
