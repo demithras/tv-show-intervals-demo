@@ -330,7 +330,7 @@ class PerformanceTestSuite:
             GROUP BY p.category
             HAVING SUM(pi.interval_count) > 1000
             ORDER BY total_intervals DESC
-            """, "Join with aggregation and HAVING clause"),
+            """, (), "Join with aggregation and HAVING clause"),
         ]
         
         self.results['join_performance'] = {}
@@ -407,14 +407,14 @@ class PerformanceTestSuite:
             'detailed_results': self.results
         }
 
-    def run_full_performance_suite(self, skip_data_generation=False):
+    def run_full_performance_suite(self, records=1000000, batch_size=10000, skip_data_generation=False):
         """Run the complete performance test suite."""
         if not skip_data_generation:
             logger.info("Enhancing schema for performance testing...")
             self.generator.enhance_schema_for_performance()
             
             logger.info("Generating test data...")
-            self.generator.bulk_insert_programs(total_records=1000000, batch_size=5000)
+            self.generator.bulk_insert_programs(total_records=records, batch_size=batch_size)
         
         logger.info("Running performance tests...")
         

@@ -50,7 +50,7 @@ def run_test_suite(test_type, records, batch_size, db_connection):
     start_time = time.time()
     
     if test_type == 'full':
-        report = suite.run_full_performance_suite(skip_data_generation=False)
+        report = suite.run_full_performance_suite(records=records, batch_size=batch_size, skip_data_generation=False)
     elif test_type == 'quick':
         report = suite.run_quick_performance_suite(records=records, batch_size=batch_size)
     elif test_type == 'insert-only':
