@@ -1,0 +1,446 @@
+name: Performance Tests
+
+on:
+  # Manual trigger for performance testing
+  workflow_dispatch:
+    inputs:
+      record_count:
+        description: 'Number of records to generate'
+        required: true
+        default: '100000'
+        type: string
+      batch_size:
+        description: 'Batch size for inserts'
+        required: true
+        default: '5000'
+        type: string
+      test_type:
+        description: 'Type of performance test'
+        required: true
+        default: 'quick'
+        type: choice
+        options:
+        - full
+        - quick
+        - insert-only
+        - query-only
+      cleanup_data:
+        description: 'Clean up test data after completion'
+        required: false
+        default: true
+        type: boolean
+  
+  # Automatic trigger on main branch for major changes
+  push:
+    branches: [ main ]
+    paths:
+      - 'schema.sql'
+      - 'performance_*.py'
+      - 'run_performance_tests.py'
+      - '.github/workflows/performance-tests.yml'
+  
+  # Optional: Performance tests on PRs (uncomment to enable)
+  # pull_request:
+  #   branches: [ main ]
+  #   paths:
+  #     - 'schema.sql'
+  #     - 'performance_*.py'
+  #     - 'run_performance_tests.py'
+  
+  # Weekly performance regression testing
+  schedule:
+    - cron: '0 2 * * 0'  # Every Sunday at 2 AM UTC
+
+concurrency:
+  group: performance-${{ github.ref }}-${{ github.run_id }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: write
+  pages: write
+  id-token: write
+
+jobs:
+  performance-test:
+    name: Run Performance Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 90  # Performance tests may take longer
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+          
+          # Install Allure CLI for performance reporting
+          curl -o allure-2.24.0.tgz -Ls https://github.com/allure-framework/allure2/releases/download/2.24.0/allure-2.24.0.tgz
+          sudo tar -zxvf allure-2.24.0.tgz -C /opt/
+          sudo ln -s /opt/allure-2.24.0/bin/allure /usr/bin/allure
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Create Neon Branch for Performance Testing
+        id: create_neon_branch
+        uses: neondatabase/create-branch-action@v5
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch_name: performance/run-${{ github.run_number }}
+          api_key: ${{ secrets.NEON_API_KEY }}
+
+      - name: Initialize database schema
+        run: |
+          echo "🗄️ Applying schema to performance test database..."
+          psql "${{ steps.create_neon_branch.outputs.db_url_with_pooler }}" -f schema.sql
+
+      - name: Set test parameters
+        id: test_params
+        run: |
+          # Set parameters based on trigger type and inputs
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            RECORD_COUNT="${{ github.event.inputs.record_count }}"
+            BATCH_SIZE="${{ github.event.inputs.batch_size }}"
+            TEST_TYPE="${{ github.event.inputs.test_type }}"
+            CLEANUP_DATA="${{ github.event.inputs.cleanup_data }}"
+          elif [ "${{ github.event_name }}" = "schedule" ]; then
+            RECORD_COUNT="1000000"
+            BATCH_SIZE="10000"
+            TEST_TYPE="full"
+            CLEANUP_DATA="true"
+          else
+            # Push to main - quick performance check
+            RECORD_COUNT="50000"
+            BATCH_SIZE="5000"
+            TEST_TYPE="quick"
+            CLEANUP_DATA="true"
+          fi
+          
+          echo "record_count=$RECORD_COUNT" >> $GITHUB_OUTPUT
+          echo "batch_size=$BATCH_SIZE" >> $GITHUB_OUTPUT
+          echo "test_type=$TEST_TYPE" >> $GITHUB_OUTPUT
+          echo "cleanup_data=$CLEANUP_DATA" >> $GITHUB_OUTPUT
+          
+          echo "📊 Performance test parameters:"
+          echo "  Record count: $RECORD_COUNT"
+          echo "  Batch size: $BATCH_SIZE"
+          echo "  Test type: $TEST_TYPE"
+          echo "  Cleanup data: $CLEANUP_DATA"
+
+      - name: Run performance tests
+        id: run_tests
+        env:
+          DATABASE_URL: ${{ steps.create_neon_branch.outputs.db_url_with_pooler }}
+        run: |
+          echo "🚀 Starting performance tests..."
+          
+          # Create performance results directory
+          mkdir -p performance-results
+          
+          # Set cleanup flag
+          CLEANUP_FLAG=""
+          if [ "${{ steps.test_params.outputs.cleanup_data }}" = "true" ]; then
+            CLEANUP_FLAG="--cleanup"
+          fi
+          
+          # Run performance tests with parameters
+          python run_performance_tests.py \
+            --records ${{ steps.test_params.outputs.record_count }} \
+            --batch-size ${{ steps.test_params.outputs.batch_size }} \
+            --test-type ${{ steps.test_params.outputs.test_type }} \
+            --output-format json \
+            --output-file performance-results/results.json \
+            --log-level INFO \
+            --timeout 5400 \
+            $CLEANUP_FLAG
+          
+          echo "✅ Performance tests completed"
+
+      - name: Generate performance reports
+        if: always() && steps.run_tests.outcome != 'cancelled'
+        run: |
+          echo "📊 Generating performance analysis reports..."
+          
+          # Generate GitHub summary from results
+          python run_performance_tests.py \
+            --test-type query-only \
+            --output-format github \
+            --output-file performance-results/github-summary.md \
+            --skip-schema-setup 2>/dev/null || true
+          
+          # Create a comprehensive HTML report
+          cat > performance-results/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <title>Performance Test Results - Run #${{ github.run_number }}</title>
+              <meta charset="utf-8">
+              <style>
+                  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 2rem; }
+                  .header { border-bottom: 2px solid #eee; padding-bottom: 1rem; margin-bottom: 2rem; }
+                  .metric { background: #f8f9fa; padding: 1rem; border-radius: 8px; margin: 1rem 0; }
+                  .metric h3 { margin-top: 0; color: #0969da; }
+                  .success { border-left: 4px solid #28a745; }
+                  .warning { border-left: 4px solid #ffc107; }
+                  .error { border-left: 4px solid #dc3545; }
+                  table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+                  th, td { padding: 0.75rem; text-align: left; border-bottom: 1px solid #dee2e6; }
+                  th { background-color: #f8f9fa; font-weight: 600; }
+                  .number { font-family: 'SF Mono', Consolas, monospace; }
+                  .meta { color: #586069; font-size: 0.9em; }
+              </style>
+          </head>
+          <body>
+              <div class="header">
+                  <h1>📊 Performance Test Results</h1>
+                  <div class="meta">
+                      Run #${{ github.run_number }} • ${{ github.sha }} • $(date -u +"%Y-%m-%d %H:%M UTC")
+                  </div>
+              </div>
+              
+              <div class="metric success">
+                  <h3>Test Configuration</h3>
+                  <p><strong>Type:</strong> ${{ steps.test_params.outputs.test_type }}</p>
+                  <p><strong>Records:</strong> ${{ steps.test_params.outputs.record_count }}</p>
+                  <p><strong>Batch Size:</strong> ${{ steps.test_params.outputs.batch_size }}</p>
+                  <p><strong>Database:</strong> Neon (performance/run-${{ github.run_number }})</p>
+              </div>
+              
+              <div id="results-container">
+                  <p>Loading detailed results...</p>
+              </div>
+              
+              <script>
+                  // Load and display JSON results
+                  fetch('results.json')
+                      .then(response => response.json())
+                      .then(data => {
+                          const container = document.getElementById('results-container');
+                          container.innerHTML = formatResults(data);
+                      })
+                      .catch(error => {
+                          console.error('Error loading results:', error);
+                          document.getElementById('results-container').innerHTML = 
+                              '<div class="metric error"><h3>Error</h3><p>Failed to load detailed results.</p></div>';
+                      });
+              
+                  function formatResults(data) {
+                      let html = '';
+                      
+                      // Summary
+                      if (data.summary) {
+                          html += `
+                              <div class="metric success">
+                                  <h3>📈 Summary</h3>
+                                  <p><strong>Total Tests:</strong> ${data.summary.total_tests}</p>
+                                  <p><strong>Total Query Time:</strong> <span class="number">${data.summary.total_time?.toFixed(4)}s</span></p>
+                                  <p><strong>Average Query Time:</strong> <span class="number">${data.summary.average_time?.toFixed(4)}s</span></p>
+                              </div>
+                          `;
+                      }
+                      
+                      // Meta information
+                      if (data.meta) {
+                          html += `
+                              <div class="metric">
+                                  <h3>⚡ Execution Details</h3>
+                                  <p><strong>Total Execution Time:</strong> <span class="number">${data.meta.total_execution_time?.toFixed(2)}s</span></p>
+                                  <p><strong>Database Host:</strong> ${data.meta.database_url_host || 'localhost'}</p>
+                              </div>
+                          `;
+                      }
+                      
+                      // Detailed results
+                      if (data.detailed_results) {
+                          for (const [category, tests] of Object.entries(data.detailed_results)) {
+                              if (typeof tests === 'object' && tests !== null) {
+                                  html += `<div class="metric"><h3>${category.replace(/_/g, ' ').toUpperCase()}</h3>`;
+                                  html += '<table>';
+                                  for (const [testName, result] of Object.entries(tests)) {
+                                      if (result && typeof result === 'object' && result.execution_time !== undefined) {
+                                          html += `
+                                              <tr>
+                                                  <td>${testName}</td>
+                                                  <td class="number">${result.execution_time.toFixed(4)}s</td>
+                                                  <td class="number">${result.row_count?.toLocaleString() || 0} rows</td>
+                                              </tr>
+                                          `;
+                                      }
+                                  }
+                                  html += '</table></div>';
+                              }
+                          }
+                      }
+                      
+                      return html;
+                  }
+              </script>
+          </body>
+          </html>
+          EOF
+          
+          echo "📋 Reports generated successfully"
+
+      - name: Upload performance results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: performance-results-${{ github.run_number }}
+          path: performance-results/
+          retention-days: 90  # Keep performance data longer
+
+      - name: Deploy performance report to GitHub Pages
+        if: always() && steps.run_tests.outcome != 'cancelled'
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./performance-results
+          destination_dir: performance/run-${{ github.run_number }}
+          keep_files: true
+          force_orphan: false
+          user_name: 'github-actions[bot]'
+          user_email: 'github-actions[bot]@users.noreply.github.com'
+          commit_message: 'Performance test results for run #${{ github.run_number }}'
+
+      - name: Update performance dashboard
+        if: always() && steps.run_tests.outcome != 'cancelled'
+        run: |
+          echo "📊 Updating performance dashboard..."
+          
+          # Create or update global performance index
+          mkdir -p dashboard
+          
+          cat > dashboard/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <title>TV Show Intervals - Performance Dashboard</title>
+              <meta charset="utf-8">
+              <style>
+                  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 2rem; }
+                  .header { border-bottom: 2px solid #eee; padding-bottom: 1rem; margin-bottom: 2rem; }
+                  .run-item { background: #f8f9fa; padding: 1rem; border-radius: 8px; margin: 1rem 0; }
+                  .run-item h3 { margin-top: 0; }
+                  .meta { color: #586069; font-size: 0.9em; }
+                  .status { padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.8em; }
+                  .success { background: #d4edda; color: #155724; }
+                  .latest { border-left: 4px solid #0969da; }
+              </style>
+          </head>
+          <body>
+              <div class="header">
+                  <h1>📊 Performance Test Dashboard</h1>
+                  <p>Historical performance test results for TV Show Intervals Demo</p>
+              </div>
+              
+              <div class="run-item latest">
+                  <h3>🆕 Latest Run #${{ github.run_number }}</h3>
+                  <p><strong>Type:</strong> ${{ steps.test_params.outputs.test_type }}</p>
+                  <p><strong>Records:</strong> ${{ steps.test_params.outputs.record_count }}</p>
+                  <p><strong>Trigger:</strong> ${{ github.event_name }}</p>
+                  <p><strong>Commit:</strong> <code>${{ github.sha }}</code></p>
+                  <p><strong>Time:</strong> $(date -u +"%Y-%m-%d %H:%M UTC")</p>
+                  <p><a href="run-${{ github.run_number }}/">📈 View Detailed Results</a></p>
+              </div>
+              
+              <h2>📚 All Performance Test Runs</h2>
+              <p>Click on any run number to view detailed performance results.</p>
+              
+              <div class="meta">
+                  Dashboard updated automatically by GitHub Actions
+              </div>
+          </body>
+          </html>
+          EOF
+
+      - name: Deploy dashboard to GitHub Pages
+        if: always() && steps.run_tests.outcome != 'cancelled'
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dashboard
+          destination_dir: performance
+          keep_files: true
+          force_orphan: false
+          user_name: 'github-actions[bot]'
+          user_email: 'github-actions[bot]@users.noreply.github.com'
+          commit_message: 'Update performance dashboard for run #${{ github.run_number }}'
+
+      - name: Comment on triggering PR (if applicable)
+        if: always() && github.event_name == 'workflow_dispatch' && github.event.pull_request
+        run: |
+          # Generate performance comment for PR
+          PERF_URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/performance/run-${{ github.run_number }}"
+          DASHBOARD_URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/performance/"
+          
+          # Read performance summary if available
+          if [ -f "performance-results/github-summary.md" ]; then
+            SUMMARY=$(cat performance-results/github-summary.md)
+          else
+            SUMMARY="Performance test completed. Results available in detailed report."
+          fi
+          
+          cat > perf-comment.json << EOF
+          {
+            "body": "## ⚡ Performance Test Results (Run #${{ github.run_number }})\n\n$SUMMARY\n\n### 📊 Detailed Reports\n\n- 📈 **[View Performance Report]($PERF_URL)** - Complete performance analysis\n- 📊 **[Performance Dashboard]($DASHBOARD_URL)** - Historical performance trends\n- 📁 **[Download Raw Data](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})** - Performance test artifacts\n\n**Test Configuration:**\n- Records: ${{ steps.test_params.outputs.record_count }}\n- Batch size: ${{ steps.test_params.outputs.batch_size }}\n- Test type: ${{ steps.test_params.outputs.test_type }}\n- Cleanup: ${{ steps.test_params.outputs.cleanup_data }}\n\n---\n*🤖 Performance test completed • $(date -u +\"%Y-%m-%d %H:%M UTC\")*"
+          }
+          EOF
+          
+          curl -s -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" \
+            -d @perf-comment.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Post workflow summary
+        if: always()
+        run: |
+          # Create workflow summary
+          PERF_URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/performance/run-${{ github.run_number }}"
+          
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          ## 📊 Performance Test Summary
+          
+          **Run #${{ github.run_number }}** completed with the following configuration:
+          
+          - **Test Type**: ${{ steps.test_params.outputs.test_type }}
+          - **Records**: ${{ steps.test_params.outputs.record_count }}
+          - **Batch Size**: ${{ steps.test_params.outputs.batch_size }}
+          - **Trigger**: ${{ github.event_name }}
+          - **Cleanup**: ${{ steps.test_params.outputs.cleanup_data }}
+          
+          ### 📈 Results
+          
+          - 📊 **[View Detailed Report]($PERF_URL)** - Complete performance analysis
+          - 📁 **[Download Artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})** - Raw performance data
+          
+          ### 🔗 Quick Links
+          
+          - [Performance Dashboard](https://demithras.github.io/tv-show-intervals-demo/performance/)
+          - [GitHub Repository](${{ github.server_url }}/${{ github.repository }})
+          
+          ---
+          *Completed at $(date -u +"%Y-%m-%d %H:%M UTC")*
+          EOF
+
+      - name: Clean up Neon branch
+        if: always()
+        uses: neondatabase/delete-branch-action@v3
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch: performance/run-${{ github.run_number }}
+          api_key: ${{ secrets.NEON_API_KEY }}
