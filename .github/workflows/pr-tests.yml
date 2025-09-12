@@ -315,24 +315,60 @@ jobs:
           ERRORS=0
           PASSED=0
           
-          if [ -f test-results.xml ]; then
-            echo "✅ Found test-results.xml, parsing..."
+          # Parse TAP output directly for more reliable results
+          if [ -f tap_output.txt ]; then
+            echo "✅ Found TAP output, parsing test results..."
             
-            # Extract test summary from JUnit XML with better error handling
+            # Extract total tests from TAP plan (1..N format)
+            TOTAL_TESTS=$(grep -o "1\.\.[0-9]*" tap_output.txt | cut -d'.' -f3 || echo "0")
+            
+            # Count failures from TAP output
+            FAILURES=$(grep -c "^[ ]*not ok" tap_output.txt || echo "0")
+            
+            # Count total test lines (ok + not ok)
+            ACTUAL_TESTS=$(grep -c "^[ ]*(not )*ok [0-9]" tap_output.txt || echo "0")
+            
+            # Use actual test count if different from plan
+            if [ "$ACTUAL_TESTS" -gt 0 ] && [ "$ACTUAL_TESTS" -ne "$TOTAL_TESTS" ]; then
+              echo "⚠️ Plan shows $TOTAL_TESTS tests, but found $ACTUAL_TESTS actual results"
+              TOTAL_TESTS=$ACTUAL_TESTS
+            fi
+            
+            # Errors are usually 0 in pgTAP (failures are test assertions that failed)
+            ERRORS=0
+            
+            # Calculate passed tests
+            PASSED=$((TOTAL_TESTS - FAILURES - ERRORS))
+            
+            echo "📊 TAP parsing results:"
+            echo "  Total tests planned: $TOTAL_TESTS"
+            echo "  Actual test results: $ACTUAL_TESTS" 
+            echo "  Failed tests: $FAILURES"
+            echo "  Passed tests: $PASSED"
+            echo "  Errors: $ERRORS"
+            
+            # Show sample TAP lines for debugging
+            echo "🔍 Sample TAP output lines:"
+            grep -E "^[ ]*(ok|not ok)" tap_output.txt | head -3 || echo "No TAP result lines found"
+            
+          elif [ -f test-results.xml ]; then
+            echo "⚠️ No TAP output found, falling back to JUnit XML parsing..."
+            
+            # Extract test summary from JUnit XML with better error handling  
             TOTAL_TESTS=$(grep -o 'tests="[^"]*"' test-results.xml | grep -o '[0-9]*' | head -1 || echo "0")
             FAILURES=$(grep -o 'failures="[^"]*"' test-results.xml | grep -o '[0-9]*' | head -1 || echo "0")
             ERRORS=$(grep -o 'errors="[^"]*"' test-results.xml | grep -o '[0-9]*' | head -1 || echo "0")
             
             # Ensure all values are numeric
             TOTAL_TESTS=${TOTAL_TESTS:-0}
-            FAILURES=${FAILURES:-0}
+            FAILURES=${FAILURES:-0} 
             ERRORS=${ERRORS:-0}
             
             PASSED=$((TOTAL_TESTS - FAILURES - ERRORS))
             
-            echo "📊 Test summary: Total=$TOTAL_TESTS, Passed=$PASSED, Failed=$FAILURES, Errors=$ERRORS"
+            echo "📊 JUnit XML parsing results: Total=$TOTAL_TESTS, Passed=$PASSED, Failed=$FAILURES, Errors=$ERRORS"
           else
-            echo "⚠️ No test-results.xml found - using default values"
+            echo "⚠️ No test results found (neither TAP nor JUnit XML) - using default values"
           fi
           
           # Determine status and appropriate messaging
