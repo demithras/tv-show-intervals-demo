@@ -1,0 +1,3 @@
+Program: Starts At Midnight
+Expected: 2
+Actual: 2
