@@ -4,9 +4,9 @@ Feature: Data Integrity Between Programs and Program Intervals Tables
   So that I can maintain data consistency and completeness across the system
 
 # background is for demo purposes only, in real life real data would be used
+# Note: Data loading is now handled by the load_data.sh script before running tests
   Background:
-    Given the database is clean
-    And I load the full day programming schedule from CSV file "full_day_programs.csv"
+    Given the database is clean with test data loaded
 
   Scenario: All programs from the programs table should exist in the program_intervals table
     When I query both programs and program_intervals tables

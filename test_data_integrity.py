@@ -40,10 +40,20 @@ def setup_allure_test_id(request):
 
 
 # Background and Given steps
-@given("the database is clean")
-def database_is_clean(clean_database):
-    """Ensure the database starts clean for each scenario."""
-    allure.attach("Database cleaned successfully", name="Database State", attachment_type=allure.attachment_type.TEXT)
+@given("the database is clean with test data loaded")
+def database_is_clean_with_data_loaded(clean_database):
+    """Ensure the database is clean and verify test data is loaded.
+    
+    Note: Test data should be loaded using load_data.sh script before running tests.
+    This step only verifies that data exists and provides cleanup for test isolation.
+    """
+    # Check if test data is available
+    programs = get_programs(clean_database)
+    if not programs:
+        pytest.skip("No test data found. Please run './load_data.sh' before running tests.")
+    
+    allure.attach(f"Test data verified: {len(programs)} programs found", 
+                  name="Database State", attachment_type=allure.attachment_type.TEXT)
 
 
 @given("I load the full day programming schedule from CSV:")
@@ -67,33 +77,37 @@ def load_full_day_schedule_from_datatable(clean_database, datatable):
     allure.attach(f"Total programs loaded: {len(programs_loaded)}", name="Load Summary", attachment_type=allure.attachment_type.TEXT)
 
 
-@given(parsers.parse('I load the full day programming schedule from CSV file "{csv_filename}"'))
-def load_full_day_schedule_from_csv(clean_database, csv_filename):
-    """Load the complete day's programming schedule from a CSV file."""
-    # Get the absolute path to the CSV file
-    csv_path = os.path.join(os.path.dirname(__file__), csv_filename)
-    
-    if not os.path.exists(csv_path):
-        raise FileNotFoundError(f"CSV file not found: {csv_path}")
-    
-    programs_loaded = []
-    
-    with open(csv_path, 'r', newline='', encoding='utf-8') as csvfile:
-        reader = csv.DictReader(csvfile)
-        
-        for row in reader:
-            program_name = row['program_name']
-            start_time = row['start_time']
-            end_time = row['end_time']
-            
-            insert_program(clean_database, program_name, start_time, end_time)
-            programs_loaded.append(f"{program_name} ({start_time}-{end_time})")
-    
-    # Attach loaded programs to Allure report
-    program_data = "\n".join(programs_loaded)
-    allure.attach(program_data, name="Full Day Schedule Loaded from CSV", attachment_type=allure.attachment_type.TEXT)
-    allure.attach(f"Total programs loaded: {len(programs_loaded)}", name="Load Summary", attachment_type=allure.attachment_type.TEXT)
-    allure.attach(f"CSV file: {csv_filename}", name="Source File", attachment_type=allure.attachment_type.TEXT)
+# CSV Loading step definitions - DEPRECATED
+# These steps have been moved to load_data.sh script for better separation of concerns
+# and to allow data loading outside of the test execution context
+
+# @given(parsers.parse('I load the full day programming schedule from CSV file "{csv_filename}"'))
+# def load_full_day_schedule_from_csv(clean_database, csv_filename):
+#     """Load the complete day's programming schedule from a CSV file."""
+#     # Get the absolute path to the CSV file
+#     csv_path = os.path.join(os.path.dirname(__file__), csv_filename)
+#     
+#     if not os.path.exists(csv_path):
+#         raise FileNotFoundError(f"CSV file not found: {csv_path}")
+#     
+#     programs_loaded = []
+#     
+#     with open(csv_path, 'r', newline='', encoding='utf-8') as csvfile:
+#         reader = csv.DictReader(csvfile)
+#         
+#         for row in reader:
+#             program_name = row['program_name']
+#             start_time = row['start_time']
+#             end_time = row['end_time']
+#             
+#             insert_program(clean_database, program_name, start_time, end_time)
+#             programs_loaded.append(f"{program_name} ({start_time}-{end_time})")
+#     
+#     # Attach loaded programs to Allure report
+#     program_data = "\n".join(programs_loaded)
+#     allure.attach(program_data, name="Full Day Schedule Loaded from CSV", attachment_type=allure.attachment_type.TEXT)
+#     allure.attach(f"Total programs loaded: {len(programs_loaded)}", name="Load Summary", attachment_type=allure.attachment_type.TEXT)
+#     allure.attach(f"CSV file: {csv_filename}", name="Source File", attachment_type=allure.attachment_type.TEXT)
 
 
 # When steps
