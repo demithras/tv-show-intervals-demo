@@ -1,0 +1,275 @@
+{
+  "summary": {
+    "total_tests": 28,
+    "total_time": 19.37187385559082,
+    "average_time": 0.6918526376996722
+  },
+  "detailed_results": {
+    "basic_queries": {
+      "Count all programs": {
+        "execution_time": 0.39453601837158203,
+        "row_count": 1,
+        "rows_per_second": 2.534622831465237,
+        "description": "Count all programs"
+      },
+      "Count all intervals": {
+        "execution_time": 0.23911476135253906,
+        "row_count": 1,
+        "rows_per_second": 4.182092290511706,
+        "description": "Count all intervals"
+      },
+      "Top 100 by intervals": {
+        "execution_time": 0.180145263671875,
+        "row_count": 100,
+        "rows_per_second": 555.107572420803,
+        "description": "Top 100 by intervals"
+      },
+      "Programs by category": {
+        "execution_time": 0.27663636207580566,
+        "row_count": 10,
+        "rows_per_second": 36.14853783126217,
+        "description": "Programs by category"
+      },
+      "Top 10 channels by program count": {
+        "execution_time": 0.21241021156311035,
+        "row_count": 10,
+        "rows_per_second": 47.0787158791038,
+        "description": "Top 10 channels by program count"
+      },
+      "Programs by day of week": {
+        "execution_time": 0.19568252563476562,
+        "row_count": 7,
+        "rows_per_second": 35.77222839542274,
+        "description": "Programs by day of week"
+      },
+      "Programs by priority": {
+        "execution_time": 0.21358442306518555,
+        "row_count": 3,
+        "rows_per_second": 14.045968132631122,
+        "description": "Programs by priority"
+      }
+    },
+    "filtered_queries": {
+      "Filter by category (News)": {
+        "execution_time": 1.274590253829956,
+        "row_count": 50029,
+        "rows_per_second": 39251.0454631755,
+        "description": "Filter by category (News)"
+      },
+      "Filter by channel range (1-50)": {
+        "execution_time": 0.7605359554290771,
+        "row_count": 49975,
+        "rows_per_second": 65710.23978978777,
+        "description": "Filter by channel range (1-50)"
+      },
+      "Filter by day and priority": {
+        "execution_time": 0.7541642189025879,
+        "row_count": 50463,
+        "rows_per_second": 66912.48236813802,
+        "description": "Filter by day and priority"
+      },
+      "Prime time programs (6-10 PM)": {
+        "execution_time": 2.714686632156372,
+        "row_count": 187211,
+        "rows_per_second": 68962.2875003041,
+        "description": "Prime time programs (6-10 PM)"
+      },
+      "Sports on channels 1-100": {
+        "execution_time": 0.4330148696899414,
+        "row_count": 9983,
+        "rows_per_second": 23054.63553052644,
+        "description": "Sports on channels 1-100"
+      },
+      "Movies longer than 5 intervals": {
+        "execution_time": 0.9001610279083252,
+        "row_count": 50092,
+        "rows_per_second": 55647.821275263545,
+        "description": "Movies longer than 5 intervals"
+      },
+      "Overnight programs": {
+        "execution_time": 0.5700416564941406,
+        "row_count": 38798,
+        "rows_per_second": 68061.69261140445,
+        "description": "Overnight programs"
+      }
+    },
+    "aggregation_queries": {
+      "Category statistics with intervals": {
+        "execution_time": 0.7826285362243652,
+        "row_count": 10,
+        "rows_per_second": 12.777453845783594,
+        "description": "Category statistics with intervals"
+      },
+      "Channel-day analysis (top 100)": {
+        "execution_time": 0.631495475769043,
+        "row_count": 100,
+        "rows_per_second": 158.35426196556477,
+        "description": "Channel-day analysis (top 100)"
+      },
+      "Hourly program distribution with duration": {
+        "execution_time": 1.1253619194030762,
+        "row_count": 18,
+        "rows_per_second": 15.994854357207776,
+        "description": "Hourly program distribution with duration"
+      },
+      "Category-priority cross-analysis": {
+        "execution_time": 0.621328592300415,
+        "row_count": 30,
+        "rows_per_second": 48.28363022684601,
+        "description": "Category-priority cross-analysis"
+      },
+      "Overnight programs by day of week": {
+        "execution_time": 0.2006547451019287,
+        "row_count": 7,
+        "rows_per_second": 34.88579348793439,
+        "description": "Overnight programs by day of week"
+      }
+    },
+    "join_performance": {
+      "Inner join programs-intervals filtered by category": {
+        "execution_time": 0.9916577339172363,
+        "row_count": 50092,
+        "rows_per_second": 50513.39619177586,
+        "description": "Inner join programs-intervals filtered by category"
+      },
+      "Left join programs-intervals filtered by channel": {
+        "execution_time": 1.606518030166626,
+        "row_count": 99609,
+        "rows_per_second": 62003.03895105907,
+        "description": "Left join programs-intervals filtered by channel"
+      },
+      "Join with aggregation and HAVING clause": {
+        "execution_time": 0.5754866600036621,
+        "row_count": 10,
+        "rows_per_second": 17.37659740007938,
+        "description": "Join with aggregation and HAVING clause"
+      }
+    },
+    "index_effectiveness": {
+      "Category filter (should use idx_programs_category)": {
+        "execution_time": 0.8031165599822998,
+        "row_count": 50252,
+        "rows_per_second": 62571.24121697543,
+        "description": "Category filter (should use idx_programs_category)",
+        "explain_plan": [
+          "Bitmap Heap Scan on programs  (cost=555.41..8483.03 rows=50450 width=81) (actual time=2.019..15.256 rows=50252 loops=1)",
+          "  Recheck Cond: ((category)::text = 'Sports'::text)",
+          "  Heap Blocks: exact=7292",
+          "  Buffers: shared hit=7334",
+          "  ->  Bitmap Index Scan on idx_programs_category  (cost=0.00..542.80 rows=50450 width=0) (actual time=1.214..1.214 rows=50252 loops=1)",
+          "        Index Cond: ((category)::text = 'Sports'::text)",
+          "        Buffers: shared hit=42",
+          "Planning Time: 0.095 ms",
+          "Execution Time: 17.372 ms"
+        ]
+      },
+      "Channel filter (should use idx_programs_channel)": {
+        "execution_time": 0.10074734687805176,
+        "row_count": 1015,
+        "rows_per_second": 10074.706991823743,
+        "description": "Channel filter (should use idx_programs_channel)",
+        "explain_plan": [
+          "Bitmap Heap Scan on programs  (cost=16.13..2757.32 rows=995 width=81) (actual time=0.164..1.241 rows=1015 loops=1)",
+          "  Recheck Cond: (channel_id = 100)",
+          "  Heap Blocks: exact=952",
+          "  Buffers: shared hit=955",
+          "  ->  Bitmap Index Scan on idx_programs_channel  (cost=0.00..15.88 rows=995 width=0) (actual time=0.078..0.079 rows=1015 loops=1)",
+          "        Index Cond: (channel_id = 100)",
+          "        Buffers: shared hit=3",
+          "Planning Time: 0.081 ms",
+          "Execution Time: 1.317 ms"
+        ]
+      },
+      "Day filter (should use idx_programs_day)": {
+        "execution_time": 1.0770609378814697,
+        "row_count": 71809,
+        "rows_per_second": 66671.25087763842,
+        "description": "Day filter (should use idx_programs_day)",
+        "explain_plan": [
+          "Bitmap Heap Scan on programs  (cost=781.90..8971.62 rows=71417 width=81) (actual time=2.347..18.502 rows=71809 loops=1)",
+          "  Recheck Cond: (day_of_week = 1)",
+          "  Heap Blocks: exact=7296",
+          "  Buffers: shared hit=7355",
+          "  ->  Bitmap Index Scan on idx_programs_day  (cost=0.00..764.05 rows=71417 width=0) (actual time=1.559..1.559 rows=71809 loops=1)",
+          "        Index Cond: (day_of_week = 1)",
+          "        Buffers: shared hit=59",
+          "Planning Time: 0.083 ms",
+          "Execution Time: 21.468 ms"
+        ]
+      },
+      "Composite index test": {
+        "execution_time": 0.09247136116027832,
+        "row_count": 78,
+        "rows_per_second": 843.5043998628346,
+        "description": "Composite index test",
+        "explain_plan": [
+          "Bitmap Heap Scan on programs  (cost=5.37..280.30 rows=74 width=81) (actual time=0.030..0.135 rows=78 loops=1)",
+          "  Recheck Cond: ((channel_id = 50) AND (day_of_week = 1) AND (start_time >= '18:00:00'::time without time zone))",
+          "  Heap Blocks: exact=77",
+          "  Buffers: shared hit=80",
+          "  ->  Bitmap Index Scan on idx_programs_composite  (cost=0.00..5.35 rows=74 width=0) (actual time=0.019..0.020 rows=78 loops=1)",
+          "        Index Cond: ((channel_id = 50) AND (day_of_week = 1) AND (start_time >= '18:00:00'::time without time zone))",
+          "        Buffers: shared hit=3",
+          "Planning Time: 0.116 ms",
+          "Execution Time: 0.168 ms"
+        ]
+      }
+    },
+    "update_performance": {
+      "single_update_avg": 0.2751854228973389,
+      "single_update_median": 0.2754446268081665,
+      "single_update_min": 0.1870098114013672,
+      "single_update_max": 0.2922384738922119,
+      "batch_updates": {
+        "category_update": {
+          "time": 4.862671136856079,
+          "rows_updated": 50029,
+          "rows_per_second": 10288.378257951832
+        },
+        "channel_range_update": {
+          "time": 5.916661739349365,
+          "rows_updated": 49975,
+          "rows_per_second": 8446.485907354841
+        }
+      }
+    },
+    "overnight_performance": {
+      "insert_time": 91.95170998573303,
+      "insert_rate": 10.875273555599534,
+      "insert_count": 1000,
+      "query_result": {
+        "execution_time": 1.1878941059112549,
+        "row_count": 39798,
+        "rows_per_second": 33502.98633687574,
+        "description": "Find all overnight programs"
+      },
+      "interval_query_result": {
+        "execution_time": 0.4561476707458496,
+        "row_count": 39798,
+        "rows_per_second": 87248.06143353986,
+        "description": "Overnight programs with interval calculations"
+      },
+      "function_performance": {
+        "avg_time": 0.09131944179534912,
+        "min_time": 0.09116148948669434,
+        "max_time": 0.09143280982971191,
+        "test_count": 4
+      }
+    }
+  },
+  "meta": {
+    "total_execution_time": 281.6144995689392,
+    "test_type": "full",
+    "test_parameters": {
+      "records": 500000,
+      "batch_size": 15000
+    },
+    "timestamp": 1757703568.8946645,
+    "iso_timestamp": "2025-09-12 18:59:28 UTC",
+    "ci_environment": true,
+    "github_run_number": "6",
+    "github_sha": "f230b1d44d69c92aae28d49e60ec3ebf56edd51e",
+    "github_ref": "refs/heads/performance-testing",
+    "database_url_host": "ep-young-pond-agj20fhx-pooler.c-2.eu-central-1.aws.neon.tech"
+  }
+}
