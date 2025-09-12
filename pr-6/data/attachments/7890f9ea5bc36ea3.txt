@@ -1,0 +1,3 @@
+Programs: 18
+With intervals: 18
+Missing intervals: 0

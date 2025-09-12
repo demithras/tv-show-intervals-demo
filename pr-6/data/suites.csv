@@ -1,13 +1,13 @@
 "Status","Start Time","Stop Time","Duration in ms","Parent Suite","Suite","Sub Suite","Test Class","Test Method","Name","Description"
-"passed","Fri Sep 12 15:03:10 UTC 2025","Fri Sep 12 15:03:10 UTC 2025","482","","","","","","Program names should not be empty or null","As a TV scheduling system administrator
+"failed","Fri Sep 12 15:05:19 UTC 2025","Fri Sep 12 15:05:19 UTC 2025","508","","","","","","Program names should not be empty or null","As a TV scheduling system administrator
 I want to ensure that all programs in the programs table have corresponding entries in the program_intervals table
 So that I can maintain data consistency and completeness across the system"
-"passed","Fri Sep 12 15:03:07 UTC 2025","Fri Sep 12 15:03:09 UTC 2025","1619","","","","","","All programs from the programs table should exist in the program_intervals table","As a TV scheduling system administrator
+"passed","Fri Sep 12 15:05:16 UTC 2025","Fri Sep 12 15:05:18 UTC 2025","1692","","","","","","All programs from the programs table should exist in the program_intervals table","As a TV scheduling system administrator
 I want to ensure that all programs in the programs table have corresponding entries in the program_intervals table
 So that I can maintain data consistency and completeness across the system"
-"passed","Fri Sep 12 15:03:10 UTC 2025","Fri Sep 12 15:03:10 UTC 2025","323","","","","","","Verify no gaps in the schedule coverage","As a TV scheduling system administrator
+"passed","Fri Sep 12 15:05:18 UTC 2025","Fri Sep 12 15:05:18 UTC 2025","509","","","","","","Program intervals table should not contain orphaned entries","As a TV scheduling system administrator
 I want to ensure that all programs in the programs table have corresponding entries in the program_intervals table
 So that I can maintain data consistency and completeness across the system"
-"passed","Fri Sep 12 15:03:09 UTC 2025","Fri Sep 12 15:03:10 UTC 2025","482","","","","","","Program intervals table should not contain orphaned entries","As a TV scheduling system administrator
+"failed","Fri Sep 12 15:05:18 UTC 2025","Fri Sep 12 15:05:19 UTC 2025","341","","","","","","Verify no gaps in the schedule coverage","As a TV scheduling system administrator
 I want to ensure that all programs in the programs table have corresponding entries in the program_intervals table
 So that I can maintain data consistency and completeness across the system"
