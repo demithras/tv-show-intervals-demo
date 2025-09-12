@@ -322,11 +322,11 @@ jobs:
             # Extract total tests from TAP plan (1..N format)
             TOTAL_TESTS=$(grep -o "1\.\.[0-9]*" tap_output.txt | cut -d'.' -f3 || echo "0")
             
-            # Count failures from TAP output
-            FAILURES=$(grep -c "^[ ]*not ok" tap_output.txt || echo "0")
+            # Count failures from TAP output (looking for " not ok" with leading space)
+            FAILURES=$(grep -c "^ not ok" tap_output.txt || echo "0")
             
-            # Count total test lines (ok + not ok)
-            ACTUAL_TESTS=$(grep -c "^[ ]*(not )*ok [0-9]" tap_output.txt || echo "0")
+            # Count total test lines (both " ok" and " not ok" with leading space)
+            ACTUAL_TESTS=$(grep -c "^ \(not \)*ok [0-9]" tap_output.txt || echo "0")
             
             # Use actual test count if different from plan
             if [ "$ACTUAL_TESTS" -gt 0 ] && [ "$ACTUAL_TESTS" -ne "$TOTAL_TESTS" ]; then
@@ -349,7 +349,7 @@ jobs:
             
             # Show sample TAP lines for debugging
             echo "🔍 Sample TAP output lines:"
-            grep -E "^[ ]*(ok|not ok)" tap_output.txt | head -3 || echo "No TAP result lines found"
+            grep -E "^ (ok|not ok)" tap_output.txt | head -3 || echo "No TAP result lines found"
             
           elif [ -f test-results.xml ]; then
             echo "⚠️ No TAP output found, falling back to JUnit XML parsing..."
@@ -402,6 +402,27 @@ jobs:
           
           echo "🔗 Allure report URL: $ALLURE_URL"
           
+          # Export variables for envsubst
+          export STATUS_EMOJI
+          export STATUS  
+          export ADDITIONAL_TEXT
+          export PASSED
+          export FAILURES
+          export ERRORS
+          export TOTAL_TESTS
+          export ALLURE_URL
+          export HISTORY_URL
+          
+          echo "📊 Final test summary for comment:"
+          echo "  STATUS_EMOJI: $STATUS_EMOJI"
+          echo "  STATUS: $STATUS"
+          echo "  PASSED: $PASSED"
+          echo "  FAILURES: $FAILURES" 
+          echo "  ERRORS: $ERRORS"
+          echo "  TOTAL_TESTS: $TOTAL_TESTS"
+          echo "  ALLURE_URL: $ALLURE_URL"
+          echo "  HISTORY_URL: $HISTORY_URL"
+          
           # Create comment body content using here document
           cat > comment-body.txt << 'EOF'
           ## 🧪 pgTAP Test Results (Run #${{ github.run_number }})
@@ -439,6 +460,20 @@ jobs:
           
           # Substitute variables in the comment body
           COMMENT_BODY=$(envsubst < comment-body.txt)
+          
+          echo "📝 Comment body after variable substitution (first 500 chars):"
+          echo "$COMMENT_BODY" | head -c 500
+          echo ""
+          echo "... (truncated for brevity)"
+          
+          # Verify key substitutions worked
+          if echo "$COMMENT_BODY" | grep -q "PASSED\|FAILURES\|TOTAL_TESTS"; then
+            echo "⚠️ Warning: Some variables may not have been substituted properly"
+            echo "🔍 Variables still containing placeholders:"
+            echo "$COMMENT_BODY" | grep -o '\${[^}]*}' | sort | uniq || echo "None found"
+          else
+            echo "✅ Variable substitution appears successful"
+          fi
           
           # Create JSON payload with properly escaped content
           jq -n --arg body "$COMMENT_BODY" '{body: $body}' > comment-payload.json
