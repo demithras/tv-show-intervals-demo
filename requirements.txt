@@ -1,4 +1,1 @@
-pytest>=7.0.0
-pytest-bdd>=6.0.0
-psycopg2-binary>=2.9.0
-allure-pytest-bdd>=2.13.0
+# pgTAP-based testing dependencies\n# Minimal Python dependencies for TAP to Allure conversion\npytest>=7.0.0\nallure-pytest>=2.13.0\npsycopg2-binary>=2.9.0\n\n# Optional: Keep for any remaining Python database utilities or testing\n# These may be useful for future extensions or debugging

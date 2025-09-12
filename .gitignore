@@ -55,6 +55,7 @@ cover/
 allure-results/
 allure-report/
 results/
+allure-results-failed/
 
 # Translations
 *.mo

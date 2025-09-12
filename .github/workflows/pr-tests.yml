@@ -4,7 +4,81 @@ on:
   pull_request:
     types:
       - opened
-      - reopened
+        - name: Run pgTAP Data Integrity Tests
+        env:
+          DATABASE_URL: ${{ steps.create_neon_branch.outputs.db_url_with_pooler }}
+        run: |
+          echo "🧪 Running pgTAP data integrity tests..."
+          
+          # Create allure-results directory
+          mkdir -p allure-results
+          
+          # Run pgTAP tests and capture TAP output
+          echo "📋 Executing pgTAP test suite..."
+          psql "$DATABASE_URL" -f tests/test_runner.sql > tap_output.txt 2>&1
+          
+          # Show TAP output for debugging
+          echo "📊 TAP Test Output:"
+          echo "=================="
+          cat tap_output.txt
+          echo "=================="
+          
+          # Convert TAP output to Allure format
+          echo "🔄 Converting TAP output to Allure format..."
+          python tests/tap_to_allure.py tap_output.txt --output-dir allure-results
+          
+          # Create JUnit XML for GitHub test reporting compatibility
+          echo "📝 Generating JUnit XML for GitHub integration..."
+          python -c "
+import xml.etree.ElementTree as ET
+import re
+
+# Read TAP output
+with open('tap_output.txt', 'r') as f:
+    tap_content = f.read()
+
+# Parse test results
+tests = []
+for line in tap_content.split('\n'):
+    if re.match(r'^(ok|not ok)\s+\d+', line.strip()):
+        tests.append(line.strip())
+
+# Create JUnit XML
+testsuite = ET.Element('testsuite')
+testsuite.set('name', 'pgTAP Data Integrity Tests')
+testsuite.set('tests', str(len(tests)))
+
+failed = 0
+for i, test_line in enumerate(tests, 1):
+    testcase = ET.SubElement(testsuite, 'testcase')
+    
+    # Extract test description
+    match = re.match(r'^(ok|not ok)\s+\d+\s*-?\s*(.*)', test_line)
+    if match:
+        status = match.group(1)
+        description = match.group(2).strip() or f'Test {i}'
+    else:
+        status = 'not ok'
+        description = f'Test {i}'
+    
+    testcase.set('name', description)
+    testcase.set('classname', 'DataIntegrityTests')
+    
+    if status == 'not ok':
+        failed += 1
+        failure = ET.SubElement(testcase, 'failure')
+        failure.set('message', f'pgTAP assertion failed: {description}')
+        failure.text = test_line
+
+testsuite.set('failures', str(failed))
+
+# Write JUnit XML
+tree = ET.ElementTree(testsuite)
+ET.indent(tree, space='  ', level=0)
+tree.write('test-results.xml', encoding='utf-8', xml_declaration=True)
+"
+          
+          echo "✅ pgTAP tests completed successfully"ened
       - synchronize
       - closed
 
@@ -37,17 +111,18 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y postgresql-client
+          sudo apt-get install -y postgresql-client postgresql-contrib
           
           # Install Allure CLI
           curl -o allure-2.24.0.tgz -Ls https://github.com/allure-framework/allure2/releases/download/2.24.0/allure-2.24.0.tgz
           sudo tar -zxvf allure-2.24.0.tgz -C /opt/
           sudo ln -s /opt/allure-2.24.0/bin/allure /usr/bin/allure
 
-      - name: Install Python dependencies
+      - name: Install Python dependencies for TAP conversion
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          # Install minimal dependencies for TAP to Allure conversion
+          pip install pytest allure-pytest psycopg2-binary
 
       - name: Create Neon Branch
         id: create_neon_branch
@@ -57,10 +132,15 @@ jobs:
           branch_name: preview/pr-${{ github.event.number }}
           api_key: ${{ secrets.NEON_API_KEY }}
 
-      - name: Run database migrations
+      - name: Run database migrations with pgTAP
         run: |
-          # Apply the schema to the Neon branch database using the full connection URL
+          # Apply the schema including pgTAP extension to the Neon branch database
+          echo "🔧 Applying database schema with pgTAP support..."
           psql "${{ steps.create_neon_branch.outputs.db_url_with_pooler }}" -f schema.sql
+          
+          # Verify pgTAP extension is available
+          echo "✅ Verifying pgTAP installation..."
+          psql "${{ steps.create_neon_branch.outputs.db_url_with_pooler }}" -c "SELECT 'pgTAP Version: ' || extversion FROM pg_extension WHERE extname = 'pgtap';"
 
       - name: Load test data
         env:
@@ -126,20 +206,7 @@ jobs:
             echo "ℹ️ No history file in generated report (first run)"
           fi
           
-          # Add environment information with more details
-          cat > allure-report/environment.properties << EOF
-          Database.Host=${{ steps.create_neon_branch.outputs.db_url_with_pooler }}
-          Python.Version=3.11
-          Test.Framework=pytest-bdd
-          CI.Provider=GitHub Actions
-          PR.Number=${{ github.event.number }}
-          Branch.Name=${{ github.head_ref }}
-          Commit.SHA=${{ github.sha }}
-          Run.Number=${{ github.run_number }}
-          Run.Attempt=${{ github.run_attempt }}
-          Timestamp=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
-          Repository=${{ github.repository }}
-          EOF
+          # Add environment information with more details\n          cat > allure-report/environment.properties << EOF\n          Database.Host=${{ steps.create_neon_branch.outputs.db_url_with_pooler }}\n          Python.Version=3.11\n          Test.Framework=pgTAP\n          Test.Type=Data Integrity\n          CI.Provider=GitHub Actions\n          PR.Number=${{ github.event.number }}\n          Branch.Name=${{ github.head_ref }}\n          Commit.SHA=${{ github.sha }}\n          Run.Number=${{ github.run_number }}\n          Run.Attempt=${{ github.run_attempt }}\n          Timestamp=$(date -u \"+%Y-%m-%d %H:%M:%S UTC\")
           
           # Add test execution metadata for better history tracking
           if [ -f "allure-report/widgets/summary.json" ]; then
@@ -215,8 +282,7 @@ jobs:
         uses: dorny/test-reporter@v1
         if: always()
         continue-on-error: true
-        with:
-          name: BDD Test Results (Run #${{ github.run_number }})
+        with:\n          name: pgTAP Test Results (Run #${{ github.run_number }})
           path: test-results.xml
           reporter: java-junit
           fail-on-error: false
