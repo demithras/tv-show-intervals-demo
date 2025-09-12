@@ -62,6 +62,15 @@ jobs:
           # Apply the schema to the Neon branch database using the full connection URL
           psql "${{ steps.create_neon_branch.outputs.db_url_with_pooler }}" -f schema.sql
 
+      - name: Load test data
+        env:
+          DATABASE_URL: ${{ steps.create_neon_branch.outputs.db_url_with_pooler }}
+        run: |
+          # Load test data using the load_data.sh script
+          echo "🔄 Loading test data into Neon database..."
+          ./load_data.sh
+          echo "✅ Test data loaded successfully"
+
       - name: Run BDD tests
         env:
           # Use the full database URL for Python connection

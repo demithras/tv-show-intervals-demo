@@ -135,6 +135,45 @@ Each test scenario runs with a clean database state using:
 - Explicit cleanup fixtures
 - Isolated test data
 
+## Data Loading
+
+### Loading Test Data
+
+Before running tests, load the test data using the provided script:
+
+```bash
+./load_data.sh
+```
+
+This script will:
+1. Clean the database (remove existing data)
+2. Load programs from `full_day_programs.csv`
+3. Automatically calculate intervals via database triggers
+4. Verify the data was loaded correctly
+
+### Custom CSV File
+
+You can load a different CSV file:
+
+```bash
+./load_data.sh my_custom_programs.csv
+```
+
+### Data Verification
+
+To see the loaded data during the loading process:
+
+```bash
+VERIFY_DATA=true ./load_data.sh
+```
+
+### Environment Variables
+
+The script supports the same database connection options as the tests:
+
+- **DATABASE_URL**: Full connection string (for Neon, Docker, etc.)
+- **DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD**: Individual parameters
+
 ## Running Tests
 
 ### All tests with verbose output:
