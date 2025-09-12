@@ -51,6 +51,21 @@ coverage.xml
 .pytest_cache/
 cover/
 
+# Allure test results
+allure-results/
+allure-report/
+results/
+allure-results-failed/
+
+# pgTAP test output files
+tap_output.txt
+tap_output_failed.txt
+test-results.xml
+comment-payload.json
+comment-body.txt
+fallback-comment.json
+fallback-body.txt
+
 # Translations
 *.mo
 *.pot
