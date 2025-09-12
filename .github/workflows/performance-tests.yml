@@ -7,12 +7,12 @@ on:
       record_count:
         description: 'Number of records to generate'
         required: true
-        default: '100000'
+        default: '500000'
         type: string
       batch_size:
         description: 'Batch size for inserts'
         required: true
-        default: '5000'
+        default: '15000'
         type: string
       test_type:
         description: 'Type of performance test'
@@ -117,13 +117,13 @@ jobs:
             CLEANUP_DATA="${{ github.event.inputs.cleanup_data }}"
           elif [ "${{ github.event_name }}" = "schedule" ]; then
             RECORD_COUNT="1000000"
-            BATCH_SIZE="10000"
+            BATCH_SIZE="15000"
             TEST_TYPE="full"
             CLEANUP_DATA="true"
           else
             # Push to main - quick performance check
-            RECORD_COUNT="50000"
-            BATCH_SIZE="5000"
+            RECORD_COUNT="100000"
+            BATCH_SIZE="15000"
             TEST_TYPE="quick"
             CLEANUP_DATA="true"
           fi
