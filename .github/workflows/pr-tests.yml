@@ -4,7 +4,6 @@ on:
   pull_request:
     types:
       - opened
-      - reopened
       - synchronize
       - closed
 
@@ -21,7 +20,7 @@ permissions:
 
 jobs:
   test:
-    name: Run BDD Tests
+    name: Run pgTAP Data Integrity Tests
     if: github.event.action != 'closed'
     runs-on: ubuntu-latest
     steps:
@@ -37,17 +36,18 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y postgresql-client
+          sudo apt-get install -y postgresql-client postgresql-contrib
           
           # Install Allure CLI
           curl -o allure-2.24.0.tgz -Ls https://github.com/allure-framework/allure2/releases/download/2.24.0/allure-2.24.0.tgz
           sudo tar -zxvf allure-2.24.0.tgz -C /opt/
           sudo ln -s /opt/allure-2.24.0/bin/allure /usr/bin/allure
 
-      - name: Install Python dependencies
+      - name: Install Python dependencies for TAP conversion
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          # Install minimal dependencies for TAP to Allure conversion
+          pip install psycopg2-binary
 
       - name: Create Neon Branch
         id: create_neon_branch
@@ -57,22 +57,53 @@ jobs:
           branch_name: preview/pr-${{ github.event.number }}
           api_key: ${{ secrets.NEON_API_KEY }}
 
-      - name: Run database migrations
+      - name: Run database migrations with pgTAP
         run: |
-          # Apply the schema to the Neon branch database using the full connection URL
+          # Apply the schema including pgTAP extension to the Neon branch database
+          echo "🔧 Applying database schema with pgTAP support..."
           psql "${{ steps.create_neon_branch.outputs.db_url_with_pooler }}" -f schema.sql
+          
+          # Verify pgTAP extension is available
+          echo "✅ Verifying pgTAP installation..."
+          psql "${{ steps.create_neon_branch.outputs.db_url_with_pooler }}" -c "SELECT 'pgTAP Version: ' || extversion FROM pg_extension WHERE extname = 'pgtap';"
 
-      - name: Run BDD tests
+      - name: Load test data
         env:
-          # Use the full database URL for Python connection
           DATABASE_URL: ${{ steps.create_neon_branch.outputs.db_url_with_pooler }}
         run: |
-          # Run pytest with BDD tests and generate both JUnit XML and Allure reports
-          pytest -v --tb=short \
-            --junitxml=test-results.xml \
-            --alluredir=allure-results \
-            --allure-link-pattern=issue:https://github.com/${{ github.repository }}/issues/{} \
-            --allure-link-pattern=test_case:https://github.com/${{ github.repository }}/blob/${{ github.sha }}/features/{}
+          # Load test data using the load_data.sh script
+          echo "🔄 Loading test data into Neon database..."
+          ./load_data.sh
+          echo "✅ Test data loaded successfully"
+
+      - name: Run pgTAP Data Integrity Tests
+        env:
+          DATABASE_URL: ${{ steps.create_neon_branch.outputs.db_url_with_pooler }}
+        run: |
+          echo "🧪 Running pgTAP data integrity tests..."
+          
+          # Create allure-results directory
+          mkdir -p allure-results
+          
+          # Run pgTAP tests and capture TAP output
+          echo "📋 Executing pgTAP test suite..."
+          psql "$DATABASE_URL" -f tests/test_runner_ci.sql > tap_output.txt 2>&1
+          
+          # Show TAP output for debugging
+          echo "📊 TAP Test Output:"
+          echo "=================="
+          cat tap_output.txt
+          echo "=================="
+          
+          # Convert TAP output to Allure format
+          echo "🔄 Converting TAP output to Allure format..."
+          python tests/tap_to_allure.py tap_output.txt --output-dir allure-results
+          
+          # Create JUnit XML for GitHub test reporting compatibility
+          echo "📝 Generating JUnit XML for GitHub integration..."
+          python tests/tap_to_junit.py tap_output.txt test-results.xml
+          
+          echo "✅ pgTAP tests completed successfully"
 
       - name: Download previous Allure history
         if: always()
@@ -121,16 +152,15 @@ jobs:
           cat > allure-report/environment.properties << EOF
           Database.Host=${{ steps.create_neon_branch.outputs.db_url_with_pooler }}
           Python.Version=3.11
-          Test.Framework=pytest-bdd
+          Test.Framework=pgTAP
+          Test.Type=Data Integrity
           CI.Provider=GitHub Actions
           PR.Number=${{ github.event.number }}
           Branch.Name=${{ github.head_ref }}
           Commit.SHA=${{ github.sha }}
           Run.Number=${{ github.run_number }}
           Run.Attempt=${{ github.run_attempt }}
-          Timestamp=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
-          Repository=${{ github.repository }}
-          EOF
+          Timestamp=$(date -u "+%Y-%m-%d %H:%M:%S UTC")
           
           # Add test execution metadata for better history tracking
           if [ -f "allure-report/widgets/summary.json" ]; then
@@ -167,6 +197,39 @@ jobs:
           user_name: 'github-actions[bot]'
           user_email: 'github-actions[bot]@users.noreply.github.com'
           commit_message: 'Deploy Allure report for PR #${{ github.event.number }} (Run #${{ github.run_number }})'
+
+      - name: Check GitHub Pages configuration
+        if: always()
+        run: |
+          echo "🔍 Checking GitHub Pages configuration..."
+          
+          # Check repository settings via API
+          PAGES_INFO=$(curl -s \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/pages" || echo '{"status":"not_configured"}')
+          
+          echo "📄 Pages configuration:"
+          echo "$PAGES_INFO" | jq . || echo "$PAGES_INFO"
+          
+          # Extract key information
+          PAGES_STATUS=$(echo "$PAGES_INFO" | jq -r '.status // "unknown"')
+          PAGES_URL=$(echo "$PAGES_INFO" | jq -r '.html_url // "unknown"')
+          
+          echo "📊 Pages Status: $PAGES_STATUS"
+          echo "🔗 Pages URL: $PAGES_URL"
+          
+          if [ "$PAGES_STATUS" = "built" ]; then
+            echo "✅ GitHub Pages is properly configured and built"
+          elif [ "$PAGES_STATUS" = "building" ]; then
+            echo "🔄 GitHub Pages is currently building"
+          else
+            echo "⚠️ GitHub Pages may not be configured or enabled"
+            echo "💡 Please ensure GitHub Pages is enabled in repository settings"
+            echo "💡 Source should be set to 'Deploy from a branch' with 'gh-pages' branch"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Generate Global History Report
         if: always() && github.event.action != 'closed'
@@ -207,10 +270,39 @@ jobs:
         if: always()
         continue-on-error: true
         with:
-          name: BDD Test Results (Run #${{ github.run_number }})
+          name: pgTAP Test Results (Run #${{ github.run_number }})
           path: test-results.xml
           reporter: java-junit
           fail-on-error: false
+
+      - name: Wait for GitHub Pages deployment
+        if: always()
+        run: |
+          echo "⏳ Waiting for GitHub Pages deployment to complete..."
+          
+          REPO_NAME="${{ github.event.repository.name }}"
+          OWNER="${{ github.repository_owner }}"
+          ALLURE_URL="https://${OWNER}.github.io/${REPO_NAME}/pr-${{ github.event.number }}"
+          
+          # Wait up to 5 minutes for deployment
+          for i in {1..30}; do
+            echo "🔍 Checking deployment... (attempt $i/30)"
+            
+            # Check if the page is accessible
+            HTTP_STATUS=$(curl -s -w "%{http_code}" -o /dev/null "${ALLURE_URL}/index.html" || echo "000")
+            
+            if [ "$HTTP_STATUS" = "200" ]; then
+              echo "✅ GitHub Pages deployment successful! Report is accessible at: ${ALLURE_URL}"
+              break
+            elif [ "$i" -eq 30 ]; then
+              echo "⚠️ GitHub Pages deployment check timed out after 5 minutes"
+              echo "🔗 Report should be available at: ${ALLURE_URL}"
+              break
+            else
+              echo "⏳ Deployment not ready yet (HTTP $HTTP_STATUS), waiting 10 seconds..."
+              sleep 10
+            fi
+          done
 
       - name: Parse and comment test results with Allure link
         if: always()
@@ -223,24 +315,60 @@ jobs:
           ERRORS=0
           PASSED=0
           
-          if [ -f test-results.xml ]; then
-            echo "✅ Found test-results.xml, parsing..."
+          # Parse TAP output directly for more reliable results
+          if [ -f tap_output.txt ]; then
+            echo "✅ Found TAP output, parsing test results..."
             
-            # Extract test summary from JUnit XML with better error handling
+            # Extract total tests from TAP plan (1..N format)
+            TOTAL_TESTS=$(grep -o "1\.\.[0-9]*" tap_output.txt | cut -d'.' -f3 || echo "0")
+            
+            # Count failures from TAP output (looking for " not ok" with leading space)
+            FAILURES=$(grep -c "^ not ok" tap_output.txt || echo "0")
+            
+            # Count total test lines (both " ok" and " not ok" with leading space)
+            ACTUAL_TESTS=$(grep -c "^ \(not \)*ok [0-9]" tap_output.txt || echo "0")
+            
+            # Use actual test count if different from plan
+            if [ "$ACTUAL_TESTS" -gt 0 ] && [ "$ACTUAL_TESTS" -ne "$TOTAL_TESTS" ]; then
+              echo "⚠️ Plan shows $TOTAL_TESTS tests, but found $ACTUAL_TESTS actual results"
+              TOTAL_TESTS=$ACTUAL_TESTS
+            fi
+            
+            # Errors are usually 0 in pgTAP (failures are test assertions that failed)
+            ERRORS=0
+            
+            # Calculate passed tests
+            PASSED=$((TOTAL_TESTS - FAILURES - ERRORS))
+            
+            echo "📊 TAP parsing results:"
+            echo "  Total tests planned: $TOTAL_TESTS"
+            echo "  Actual test results: $ACTUAL_TESTS" 
+            echo "  Failed tests: $FAILURES"
+            echo "  Passed tests: $PASSED"
+            echo "  Errors: $ERRORS"
+            
+            # Show sample TAP lines for debugging
+            echo "🔍 Sample TAP output lines:"
+            grep -E "^ (ok|not ok)" tap_output.txt | head -3 || echo "No TAP result lines found"
+            
+          elif [ -f test-results.xml ]; then
+            echo "⚠️ No TAP output found, falling back to JUnit XML parsing..."
+            
+            # Extract test summary from JUnit XML with better error handling  
             TOTAL_TESTS=$(grep -o 'tests="[^"]*"' test-results.xml | grep -o '[0-9]*' | head -1 || echo "0")
             FAILURES=$(grep -o 'failures="[^"]*"' test-results.xml | grep -o '[0-9]*' | head -1 || echo "0")
             ERRORS=$(grep -o 'errors="[^"]*"' test-results.xml | grep -o '[0-9]*' | head -1 || echo "0")
             
             # Ensure all values are numeric
             TOTAL_TESTS=${TOTAL_TESTS:-0}
-            FAILURES=${FAILURES:-0}
+            FAILURES=${FAILURES:-0} 
             ERRORS=${ERRORS:-0}
             
             PASSED=$((TOTAL_TESTS - FAILURES - ERRORS))
             
-            echo "📊 Test summary: Total=$TOTAL_TESTS, Passed=$PASSED, Failed=$FAILURES, Errors=$ERRORS"
+            echo "📊 JUnit XML parsing results: Total=$TOTAL_TESTS, Passed=$PASSED, Failed=$FAILURES, Errors=$ERRORS"
           else
-            echo "⚠️ No test-results.xml found - using default values"
+            echo "⚠️ No test results found (neither TAP nor JUnit XML) - using default values"
           fi
           
           # Determine status and appropriate messaging
@@ -254,18 +382,101 @@ jobs:
             ADDITIONAL_TEXT="**🎉 Great job!** All tests are passing successfully."
           fi
           
-          # GitHub Pages URLs
-          ALLURE_URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/pr-${{ github.event.number }}"
-          HISTORY_URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
+          # GitHub Pages URLs (ensure proper repository name format)
+          REPO_NAME="${{ github.event.repository.name }}"
+          OWNER="${{ github.repository_owner }}"
+          ALLURE_URL="https://${OWNER}.github.io/${REPO_NAME}/pr-${{ github.event.number }}"
+          HISTORY_URL="https://${OWNER}.github.io/${REPO_NAME}/"
+          
+          echo "🔍 Repository details:"
+          echo "  Owner: ${OWNER}"
+          echo "  Repository: ${REPO_NAME}"
+          echo "  Full Repository: ${{ github.repository }}"
+          echo "  Allure URL: ${ALLURE_URL}"
+          echo "  History URL: ${HISTORY_URL}"
+          
+          # Verify GitHub Pages deployment before generating comment
+          echo "🔍 Checking GitHub Pages deployment status..."
+          PAGES_STATUS=$(curl -s -w "%{http_code}" -o /dev/null "${ALLURE_URL}" || echo "000")
+          echo "📡 Pages HTTP Status: $PAGES_STATUS"
           
           echo "🔗 Allure report URL: $ALLURE_URL"
           
-          # Create robust comment body
-          cat > comment-payload.json << EOF
-          {
-            "body": "## 🧪 BDD Test Results (Run #${{ github.run_number }})\n\n${STATUS_EMOJI} **Status:** ${STATUS}\n\n### 📊 Test Summary\n\n| Result | Count |\n|--------|-------|\n| ✅ Passed | ${PASSED} |\n| ❌ Failed | ${FAILURES} |\n| 🔥 Errors | ${ERRORS} |\n| 📊 **Total** | **${TOTAL_TESTS}** |\n\n${ADDITIONAL_TEXT}\n\n### 📊 Interactive Reports\n\n- 🎯 **[View Latest Allure Report](${ALLURE_URL})** - Full test results with history trends\n- 📈 **[Browse All Test History](${HISTORY_URL})** - Historical reports across all PRs\n- 📁 **[Download Test Artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})** - Raw results and logs\n\n### 📈 Available Report Features\n\n- **🔄 Trends**: Performance and stability over time\n- **🔁 Retries**: Flaky test detection and analysis  \n- **⏱️ Duration**: Execution time trends and bottlenecks\n- **📂 Categories**: Failure pattern analysis\n- **📎 Attachments**: Database queries, program data, and debug info\n\n---\n*🤖 Automated comment generated by GitHub Actions • Run #${{ github.run_number }} • $(date -u +\"%Y-%m-%d %H:%M UTC\")*"
-          }
+          # Export variables for envsubst
+          export STATUS_EMOJI
+          export STATUS  
+          export ADDITIONAL_TEXT
+          export PASSED
+          export FAILURES
+          export ERRORS
+          export TOTAL_TESTS
+          export ALLURE_URL
+          export HISTORY_URL
+          
+          echo "📊 Final test summary for comment:"
+          echo "  STATUS_EMOJI: $STATUS_EMOJI"
+          echo "  STATUS: $STATUS"
+          echo "  PASSED: $PASSED"
+          echo "  FAILURES: $FAILURES" 
+          echo "  ERRORS: $ERRORS"
+          echo "  TOTAL_TESTS: $TOTAL_TESTS"
+          echo "  ALLURE_URL: $ALLURE_URL"
+          echo "  HISTORY_URL: $HISTORY_URL"
+          
+          # Create comment body content using here document
+          cat > comment-body.txt << 'EOF'
+          ## 🧪 pgTAP Test Results (Run #${{ github.run_number }})
+          
+          ${STATUS_EMOJI} **Status:** ${STATUS}
+          
+          ### 📊 Test Summary
+          
+          | Result | Count |
+          |--------|-------|
+          | ✅ Passed | ${PASSED} |
+          | ❌ Failed | ${FAILURES} |
+          | 🔥 Errors | ${ERRORS} |
+          | 📊 **Total** | **${TOTAL_TESTS}** |
+          
+          ${ADDITIONAL_TEXT}
+          
+          ### 📊 Interactive Reports
+          
+          - 🎯 **[View Latest Allure Report](${ALLURE_URL})** - Full test results with history trends
+          - 📈 **[Browse All Test History](${HISTORY_URL})** - Historical reports across all PRs
+          - 📁 **[Download Test Artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})** - Raw results and logs
+          
+          ### 📈 Available Report Features
+          
+          - **🔄 Trends**: Performance and stability over time
+          - **🔁 Retries**: Flaky test detection and analysis  
+          - **⏱️ Duration**: Execution time trends and bottlenecks
+          - **📂 Categories**: Failure pattern analysis
+          - **📎 Attachments**: Database queries, program data, and debug info
+          
+          ---
+          *🤖 Automated comment generated by GitHub Actions • Run #${{ github.run_number }} • $(date -u "+%Y-%m-%d %H:%M UTC")*
           EOF
+          
+          # Substitute variables in the comment body
+          COMMENT_BODY=$(envsubst < comment-body.txt)
+          
+          echo "📝 Comment body after variable substitution (first 500 chars):"
+          echo "$COMMENT_BODY" | head -c 500
+          echo ""
+          echo "... (truncated for brevity)"
+          
+          # Verify key substitutions worked
+          if echo "$COMMENT_BODY" | grep -q "PASSED\|FAILURES\|TOTAL_TESTS"; then
+            echo "⚠️ Warning: Some variables may not have been substituted properly"
+            echo "🔍 Variables still containing placeholders:"
+            echo "$COMMENT_BODY" | grep -o '\${[^}]*}' | sort | uniq || echo "None found"
+          else
+            echo "✅ Variable substitution appears successful"
+          fi
+          
+          # Create JSON payload with properly escaped content
+          jq -n --arg body "$COMMENT_BODY" '{body: $body}' > comment-payload.json
           
           echo "📝 Generated comment payload"
           
@@ -319,27 +530,48 @@ jobs:
           # Get workflow status
           WORKFLOW_STATUS="${{ job.status }}"
           
-          # GitHub Pages URLs
-          ALLURE_URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/pr-${{ github.event.number }}"
-          HISTORY_URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
+          # GitHub Pages URLs (consistent with main comment)
+          REPO_NAME="${{ github.event.repository.name }}"
+          OWNER="${{ github.repository_owner }}"
+          ALLURE_URL="https://${OWNER}.github.io/${REPO_NAME}/pr-${{ github.event.number }}"
+          HISTORY_URL="https://${OWNER}.github.io/${REPO_NAME}/"
           
-          # Create fallback comment
-          cat > fallback-comment.json << EOF
-          {
-            "body": "## 🧪 BDD Test Results (Run #${{ github.run_number }}) - Fallback Report\n\n⚠️ **Unable to parse detailed test results**, but the test execution completed.\n\n**Workflow Status:** ${WORKFLOW_STATUS}\n\n### 📊 Available Reports\n\n- 🎯 **[View Allure Report](${ALLURE_URL})** - Full test results with detailed information\n- 📈 **[Browse Test History](${HISTORY_URL})** - Historical reports across all PRs\n- 📁 **[Download Test Artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})** - Raw results and logs\n\n### 🔍 What to check\n\n1. **Allure Report**: Click the link above for the most complete test results\n2. **Workflow Logs**: Check the [GitHub Actions logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) for detailed execution information\n3. **Test Artifacts**: Download the test results and reports from the artifacts section\n\n---\n*🤖 Fallback comment generated by GitHub Actions • Run #${{ github.run_number }} • $(date -u +\"%Y-%m-%d %H:%M UTC\")*"
-          }
+          # Create fallback comment using here document
+          cat > fallback-body.txt << 'EOF'
+          ## 🧪 pgTAP Test Results (Run #${{ github.run_number }}) - Fallback Report
+          
+          ⚠️ **Unable to parse detailed test results**, but the test execution completed.
+          
+          **Workflow Status:** ${WORKFLOW_STATUS}
+          
+          ### 📊 Available Reports
+          
+          - 🎯 **[View Allure Report](${ALLURE_URL})** - Full test results with detailed information
+          - 📈 **[Browse Test History](${HISTORY_URL})** - Historical reports across all PRs
+          - 📁 **[Download Test Artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})** - Raw results and logs
+          
+          ### 🔍 What to check
+          
+          1. **Allure Report**: Click the link above for the most complete test results
+          2. **Workflow Logs**: Check the [GitHub Actions logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) for detailed execution information
+          3. **Test Artifacts**: Download the test results and reports from the artifacts section
+          
+          ---
+          *🤖 Fallback comment generated by GitHub Actions • Run #${{ github.run_number }} • $(date -u "+%Y-%m-%d %H:%M UTC")*
           EOF
+          
+          # Substitute variables and create JSON
+          FALLBACK_BODY=$(envsubst < fallback-body.txt)
+          jq -n --arg body "$FALLBACK_BODY" '{body: $body}' > fallback-comment.json
           
           echo "📝 Posting fallback comment as backup..."
           
           # Only post fallback if no recent comment exists
-          RECENT_COMMENTS=$(curl -s \
+            RECENT_COMMENTS=$(curl -s \
             -H "Authorization: Bearer $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github+json" \
             "https://api.github.com/repos/$GITHUB_REPOSITORY/issues/${{ github.event.number }}/comments?per_page=5" | \
-            grep -c "BDD Test Results (Run #${{ github.run_number }})" || echo "0")
-          
-          if [ "$RECENT_COMMENTS" -eq 0 ]; then
+            grep -c "pgTAP Test Results (Run #${{ github.run_number }})" || echo "0")          if [ "$RECENT_COMMENTS" -eq 0 ]; then
             echo "📤 No recent test result comment found, posting fallback..."
             curl -s \
               -X POST \
