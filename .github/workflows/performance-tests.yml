@@ -7,12 +7,12 @@ on:
       record_count:
         description: 'Number of records to generate'
         required: true
-        default: '100000'
+        default: '500000'
         type: string
       batch_size:
         description: 'Batch size for inserts'
         required: true
-        default: '5000'
+        default: '15000'
         type: string
       test_type:
         description: 'Type of performance test'
@@ -117,13 +117,13 @@ jobs:
             CLEANUP_DATA="${{ github.event.inputs.cleanup_data }}"
           elif [ "${{ github.event_name }}" = "schedule" ]; then
             RECORD_COUNT="1000000"
-            BATCH_SIZE="10000"
+            BATCH_SIZE="15000"
             TEST_TYPE="full"
             CLEANUP_DATA="true"
           else
             # Push to main - quick performance check
-            RECORD_COUNT="50000"
-            BATCH_SIZE="5000"
+            RECORD_COUNT="100000"
+            BATCH_SIZE="15000"
             TEST_TYPE="quick"
             CLEANUP_DATA="true"
           fi
@@ -268,13 +268,39 @@ jobs:
                               if (typeof tests === 'object' && tests !== null) {
                                   html += `<div class="metric"><h3>${category.replace(/_/g, ' ').toUpperCase()}</h3>`;
                                   html += '<table>';
+                                  
                                   for (const [testName, result] of Object.entries(tests)) {
-                                      if (result && typeof result === 'object' && result.execution_time !== undefined) {
+                                      if (result && typeof result === 'object') {
+                                          // Standard query results with execution_time
+                                          if (result.execution_time !== undefined) {
+                                              html += `
+                                                  <tr>
+                                                      <td>${testName}</td>
+                                                      <td class="number">${result.execution_time.toFixed(4)}s</td>
+                                                      <td class="number">${result.row_count?.toLocaleString() || 0} rows</td>
+                                                  </tr>
+                                              `;
+                                          } 
+                                          // Handle function performance data
+                                          else if (result.avg_time !== undefined) {
+                                              html += `
+                                                  <tr>
+                                                      <td>${testName}</td>
+                                                      <td class="number">${result.avg_time.toFixed(4)}s avg</td>
+                                                      <td class="number">${result.test_count || 1} tests</td>
+                                                  </tr>
+                                              `;
+                                          }
+                                      } 
+                                      // Handle scalar values (like single_update_avg)
+                                      else if (typeof result === 'number') {
+                                          const unit = testName.includes('time') || testName.includes('avg') ? 's' : 
+                                                      testName.includes('rate') ? ' records/sec' : '';
                                           html += `
                                               <tr>
-                                                  <td>${testName}</td>
-                                                  <td class="number">${result.execution_time.toFixed(4)}s</td>
-                                                  <td class="number">${result.row_count?.toLocaleString() || 0} rows</td>
+                                                  <td>${testName.replace(/_/g, ' ')}</td>
+                                                  <td class="number">${result.toFixed(4)}${unit}</td>
+                                                  <td></td>
                                               </tr>
                                           `;
                                       }
