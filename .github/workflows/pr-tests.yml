@@ -198,6 +198,39 @@ jobs:
           user_email: 'github-actions[bot]@users.noreply.github.com'
           commit_message: 'Deploy Allure report for PR #${{ github.event.number }} (Run #${{ github.run_number }})'
 
+      - name: Check GitHub Pages configuration
+        if: always()
+        run: |
+          echo "🔍 Checking GitHub Pages configuration..."
+          
+          # Check repository settings via API
+          PAGES_INFO=$(curl -s \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/pages" || echo '{"status":"not_configured"}')
+          
+          echo "📄 Pages configuration:"
+          echo "$PAGES_INFO" | jq . || echo "$PAGES_INFO"
+          
+          # Extract key information
+          PAGES_STATUS=$(echo "$PAGES_INFO" | jq -r '.status // "unknown"')
+          PAGES_URL=$(echo "$PAGES_INFO" | jq -r '.html_url // "unknown"')
+          
+          echo "📊 Pages Status: $PAGES_STATUS"
+          echo "🔗 Pages URL: $PAGES_URL"
+          
+          if [ "$PAGES_STATUS" = "built" ]; then
+            echo "✅ GitHub Pages is properly configured and built"
+          elif [ "$PAGES_STATUS" = "building" ]; then
+            echo "🔄 GitHub Pages is currently building"
+          else
+            echo "⚠️ GitHub Pages may not be configured or enabled"
+            echo "💡 Please ensure GitHub Pages is enabled in repository settings"
+            echo "💡 Source should be set to 'Deploy from a branch' with 'gh-pages' branch"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Generate Global History Report
         if: always() && github.event.action != 'closed'
         run: |
@@ -242,6 +275,35 @@ jobs:
           reporter: java-junit
           fail-on-error: false
 
+      - name: Wait for GitHub Pages deployment
+        if: always()
+        run: |
+          echo "⏳ Waiting for GitHub Pages deployment to complete..."
+          
+          REPO_NAME="${{ github.event.repository.name }}"
+          OWNER="${{ github.repository_owner }}"
+          ALLURE_URL="https://${OWNER}.github.io/${REPO_NAME}/pr-${{ github.event.number }}"
+          
+          # Wait up to 5 minutes for deployment
+          for i in {1..30}; do
+            echo "🔍 Checking deployment... (attempt $i/30)"
+            
+            # Check if the page is accessible
+            HTTP_STATUS=$(curl -s -w "%{http_code}" -o /dev/null "${ALLURE_URL}/index.html" || echo "000")
+            
+            if [ "$HTTP_STATUS" = "200" ]; then
+              echo "✅ GitHub Pages deployment successful! Report is accessible at: ${ALLURE_URL}"
+              break
+            elif [ "$i" -eq 30 ]; then
+              echo "⚠️ GitHub Pages deployment check timed out after 5 minutes"
+              echo "🔗 Report should be available at: ${ALLURE_URL}"
+              break
+            else
+              echo "⏳ Deployment not ready yet (HTTP $HTTP_STATUS), waiting 10 seconds..."
+              sleep 10
+            fi
+          done
+
       - name: Parse and comment test results with Allure link
         if: always()
         run: |
@@ -284,9 +346,23 @@ jobs:
             ADDITIONAL_TEXT="**🎉 Great job!** All tests are passing successfully."
           fi
           
-          # GitHub Pages URLs
-          ALLURE_URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/pr-${{ github.event.number }}"
-          HISTORY_URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
+          # GitHub Pages URLs (ensure proper repository name format)
+          REPO_NAME="${{ github.event.repository.name }}"
+          OWNER="${{ github.repository_owner }}"
+          ALLURE_URL="https://${OWNER}.github.io/${REPO_NAME}/pr-${{ github.event.number }}"
+          HISTORY_URL="https://${OWNER}.github.io/${REPO_NAME}/"
+          
+          echo "🔍 Repository details:"
+          echo "  Owner: ${OWNER}"
+          echo "  Repository: ${REPO_NAME}"
+          echo "  Full Repository: ${{ github.repository }}"
+          echo "  Allure URL: ${ALLURE_URL}"
+          echo "  History URL: ${HISTORY_URL}"
+          
+          # Verify GitHub Pages deployment before generating comment
+          echo "🔍 Checking GitHub Pages deployment status..."
+          PAGES_STATUS=$(curl -s -w "%{http_code}" -o /dev/null "${ALLURE_URL}" || echo "000")
+          echo "📡 Pages HTTP Status: $PAGES_STATUS"
           
           echo "🔗 Allure report URL: $ALLURE_URL"
           
@@ -383,9 +459,11 @@ jobs:
           # Get workflow status
           WORKFLOW_STATUS="${{ job.status }}"
           
-          # GitHub Pages URLs
-          ALLURE_URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/pr-${{ github.event.number }}"
-          HISTORY_URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
+          # GitHub Pages URLs (consistent with main comment)
+          REPO_NAME="${{ github.event.repository.name }}"
+          OWNER="${{ github.repository_owner }}"
+          ALLURE_URL="https://${OWNER}.github.io/${REPO_NAME}/pr-${{ github.event.number }}"
+          HISTORY_URL="https://${OWNER}.github.io/${REPO_NAME}/"
           
           # Create fallback comment using here document
           cat > fallback-body.txt << 'EOF'
