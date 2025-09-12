@@ -87,7 +87,7 @@ jobs:
           
           # Run pgTAP tests and capture TAP output
           echo "📋 Executing pgTAP test suite..."
-          psql "$DATABASE_URL" -f tests/test_runner.sql > tap_output.txt 2>&1
+          psql "$DATABASE_URL" -f tests/test_runner_ci.sql > tap_output.txt 2>&1
           
           # Show TAP output for debugging
           echo "📊 TAP Test Output:"
