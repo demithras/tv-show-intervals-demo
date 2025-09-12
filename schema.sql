@@ -10,12 +10,18 @@ DROP TABLE IF EXISTS program_intervals;
 DROP TABLE IF EXISTS programs;
 
 -- Programs table: stores program name, start time, and end time
+-- Enhanced with performance testing columns
 CREATE TABLE programs (
     id SERIAL PRIMARY KEY,
     program_name VARCHAR(255) NOT NULL,
     start_time TIME NOT NULL,
     end_time TIME NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    -- Performance testing columns
+    channel_id INTEGER DEFAULT NULL,
+    category VARCHAR(50) DEFAULT NULL,
+    priority INTEGER DEFAULT 1,
+    day_of_week INTEGER DEFAULT NULL,
     UNIQUE(program_name, start_time, end_time)
 );
 
@@ -113,8 +119,20 @@ CREATE INDEX idx_programs_name ON programs(program_name);
 CREATE INDEX idx_programs_times ON programs(start_time, end_time);
 CREATE INDEX idx_intervals_name ON program_intervals(program_name);
 
+-- Performance testing indexes
+CREATE INDEX idx_programs_channel ON programs(channel_id) WHERE channel_id IS NOT NULL;
+CREATE INDEX idx_programs_category ON programs(category) WHERE category IS NOT NULL;
+CREATE INDEX idx_programs_day ON programs(day_of_week) WHERE day_of_week IS NOT NULL;
+CREATE INDEX idx_programs_priority ON programs(priority) WHERE priority IS NOT NULL;
+CREATE INDEX idx_programs_composite ON programs(channel_id, day_of_week, start_time) WHERE channel_id IS NOT NULL AND day_of_week IS NOT NULL;
+CREATE INDEX idx_programs_category_priority ON programs(category, priority) WHERE category IS NOT NULL AND priority IS NOT NULL;
+
 -- Add some helpful comments
-COMMENT ON TABLE programs IS 'TV programs with their daily time slots';
+COMMENT ON TABLE programs IS 'TV programs with their daily time slots and performance testing metadata';
 COMMENT ON TABLE program_intervals IS 'Automatically calculated 15-minute intervals for each program';
 COMMENT ON FUNCTION count_15min_intervals(TIME, TIME) IS 'Calculates number of 15-minute intervals, handling overnight programs';
 COMMENT ON TRIGGER trigger_update_program_intervals ON programs IS 'Automatically maintains program_intervals table when programs change';
+COMMENT ON COLUMN programs.channel_id IS 'Channel identifier for performance testing (1-500)';
+COMMENT ON COLUMN programs.category IS 'Program category for performance testing (News, Sports, Movies, etc.)';
+COMMENT ON COLUMN programs.priority IS 'Program priority for performance testing (1-3, default 1)';
+COMMENT ON COLUMN programs.day_of_week IS 'Day of week for performance testing (1-7, Monday=1)';
