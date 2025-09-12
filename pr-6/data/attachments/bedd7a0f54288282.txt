@@ -1,0 +1,2 @@
+Schedule gaps: 0
+Coverage issues: 0

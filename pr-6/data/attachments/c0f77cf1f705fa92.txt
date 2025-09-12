@@ -1,0 +1,2 @@
+Programs with empty names: 0
+Programs with null names: 0

@@ -1,0 +1,2 @@
+Intervals with empty names: 0
+Intervals with null names: 0
