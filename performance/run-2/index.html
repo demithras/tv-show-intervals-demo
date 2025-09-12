@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Performance Test Results - Run #2</title>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 2rem; }
+        .header { border-bottom: 2px solid #eee; padding-bottom: 1rem; margin-bottom: 2rem; }
+        .metric { background: #f8f9fa; padding: 1rem; border-radius: 8px; margin: 1rem 0; }
+        .metric h3 { margin-top: 0; color: #0969da; }
+        .success { border-left: 4px solid #28a745; }
+        .warning { border-left: 4px solid #ffc107; }
+        .error { border-left: 4px solid #dc3545; }
+        table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+        th, td { padding: 0.75rem; text-align: left; border-bottom: 1px solid #dee2e6; }
+        th { background-color: #f8f9fa; font-weight: 600; }
+        .number { font-family: 'SF Mono', Consolas, monospace; }
+        .meta { color: #586069; font-size: 0.9em; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📊 Performance Test Results</h1>
+        <div class="meta">
+            Run #2 • 6ee8316e069c1cca47d2a40ee6f539a719bbe639 • $(date -u +"%Y-%m-%d %H:%M UTC")
+        </div>
+    </div>
+    
+    <div class="metric success">
+        <h3>Test Configuration</h3>
+        <p><strong>Type:</strong> full</p>
+        <p><strong>Records:</strong> 100000</p>
+        <p><strong>Batch Size:</strong> 5000</p>
+        <p><strong>Database:</strong> Neon (performance/run-2)</p>
+    </div>
+    
+    <div id="results-container">
+        <p>Loading detailed results...</p>
+    </div>
+    
+    <script>
+        // Load and display JSON results
+        fetch('results.json')
+            .then(response => response.json())
+            .then(data => {
+                const container = document.getElementById('results-container');
+                container.innerHTML = formatResults(data);
+            })
+            .catch(error => {
+                console.error('Error loading results:', error);
+                document.getElementById('results-container').innerHTML = 
+                    '<div class="metric error"><h3>Error</h3><p>Failed to load detailed results.</p></div>';
+            });
+    
+        function formatResults(data) {
+            let html = '';
+            
+            // Summary
+            if (data.summary) {
+                html += `
+                    <div class="metric success">
+                        <h3>📈 Summary</h3>
+                        <p><strong>Total Tests:</strong> ${data.summary.total_tests}</p>
+                        <p><strong>Total Query Time:</strong> <span class="number">${data.summary.total_time?.toFixed(4)}s</span></p>
+                        <p><strong>Average Query Time:</strong> <span class="number">${data.summary.average_time?.toFixed(4)}s</span></p>
+                    </div>
+                `;
+            }
+            
+            // Meta information
+            if (data.meta) {
+                html += `
+                    <div class="metric">
+                        <h3>⚡ Execution Details</h3>
+                        <p><strong>Total Execution Time:</strong> <span class="number">${data.meta.total_execution_time?.toFixed(2)}s</span></p>
+                        <p><strong>Database Host:</strong> ${data.meta.database_url_host || 'localhost'}</p>
+                    </div>
+                `;
+            }
+            
+            // Detailed results
+            if (data.detailed_results) {
+                for (const [category, tests] of Object.entries(data.detailed_results)) {
+                    if (typeof tests === 'object' && tests !== null) {
+                        html += `<div class="metric"><h3>${category.replace(/_/g, ' ').toUpperCase()}</h3>`;
+                        html += '<table>';
+                        for (const [testName, result] of Object.entries(tests)) {
+                            if (result && typeof result === 'object' && result.execution_time !== undefined) {
+                                html += `
+                                    <tr>
+                                        <td>${testName}</td>
+                                        <td class="number">${result.execution_time.toFixed(4)}s</td>
+                                        <td class="number">${result.row_count?.toLocaleString() || 0} rows</td>
+                                    </tr>
+                                `;
+                            }
+                        }
+                        html += '</table></div>';
+                    }
+                }
+            }
+            
+            return html;
+        }
+    </script>
+</body>
+</html>
