@@ -7,31 +7,41 @@ It contains 5 PRs that each implement a different way to test database changes u
 ## Testing Options
 
 ### 1. Functional tests with pytest-bdd using Neon Database
-https://github.com/demithras/tv-show-intervals-demo/pull/2
+PR: https://github.com/demithras/tv-show-intervals-demo/pull/2
+
 The tests are written in BDD style using pytest-bdd and run against a Neon database branch created for each PR.
 The tests are using clean database state for each scenario using transactions and rollbacks.
 The tests are run automatically on each PR and the results are posted as a comment and an Allure report is generated and published to GitHub Pages.
+
 Example of allure report with history: https://demithras.github.io/tv-show-intervals-demo/pr-2
 
 ### 2. Functional tests with pytest-bdd using ephemeral PostgreSQL
-https://github.com/demithras/tv-show-intervals-demo/pull/3
+PR: https://github.com/demithras/tv-show-intervals-demo/pull/3
+
 The same approach but the tests are run against a PostgreSQL database running in an ephemeral database created for each test run in GitHub Actions.
 The database is created using the official PostgreSQL Docker image and is destroyed after the tests are run. The tests are running much faster than with Neon as there is no network latency.
-Example of allure report with history: https://demithras.github.io/tv-show-intervals-demo/pr-3
+
+Report: https://demithras.github.io/tv-show-intervals-demo/pr-3
 
 ### 3. Data integrity tests with python-bdd
-https://github.com/demithras/tv-show-intervals-demo/pull/6
+PR: https://github.com/demithras/tv-show-intervals-demo/pull/6
+
 The tests are running agains a Neon database populated with data. The goal is to test that data in all tables is consistent and valid.
+
 Report: https://demithras.github.io/tv-show-intervals-demo/pr-6
 
 ### 4. Data integrity tests with pgTAP
-https://github.com/demithras/tv-show-intervals-demo/pull/7
+PR: https://github.com/demithras/tv-show-intervals-demo/pull/7
+
 The tests are written in SQL using the pgTAP extension and run against a Neon database prepopulated with data. The goal is to test that data in all tables is consistent and valid. Reports are converted to JUnit XML format so that they can be displayed in Allure format.
+
 Report: https://demithras.github.io/tv-show-intervals-demo/pr-7
 
 ### 6. Performance tests with python-bdd
-https://github.com/demithras/tv-show-intervals-demo/pull/8
+PR: https://github.com/demithras/tv-show-intervals-demo/pull/8
+
 The tests are designed to measure the performance of the database prepopulated with big amounts of synthetic data. The goal is to ensure that the database can handle large amounts of data and that the performance is acceptable. The tests are run against a Neon database branch created for each PR.
+
 Report: https://demithras.github.io/tv-show-intervals-demo/performance/run-6/
 
 ## Overview
