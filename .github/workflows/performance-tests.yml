@@ -24,6 +24,20 @@ on:
         - quick
         - insert-only
         - query-only
+      test_engine:
+        description: 'Performance test engine to use'
+        required: true
+        default: 'python'
+        type: choice
+        options:
+        - python
+        - pgbench
+        - both
+      pgbench_clients:
+        description: 'Number of concurrent pgbench clients (pgbench only)'
+        required: false
+        default: '1'
+        type: string
       cleanup_data:
         description: 'Clean up test data after completion'
         required: false
@@ -81,7 +95,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y postgresql-client
+          sudo apt-get install -y postgresql-client postgresql-contrib
           
           # Install Allure CLI for performance reporting
           curl -o allure-2.24.0.tgz -Ls https://github.com/allure-framework/allure2/releases/download/2.24.0/allure-2.24.0.tgz
@@ -114,29 +128,39 @@ jobs:
             RECORD_COUNT="${{ github.event.inputs.record_count }}"
             BATCH_SIZE="${{ github.event.inputs.batch_size }}"
             TEST_TYPE="${{ github.event.inputs.test_type }}"
+            TEST_ENGINE="${{ github.event.inputs.test_engine || 'python' }}"
+            PGBENCH_CLIENTS="${{ github.event.inputs.pgbench_clients || '1' }}"
             CLEANUP_DATA="${{ github.event.inputs.cleanup_data }}"
           elif [ "${{ github.event_name }}" = "schedule" ]; then
             RECORD_COUNT="1000000"
             BATCH_SIZE="15000"
             TEST_TYPE="full"
+            TEST_ENGINE="both"
+            PGBENCH_CLIENTS="4"
             CLEANUP_DATA="true"
           else
             # Push to main - quick performance check
             RECORD_COUNT="100000"
             BATCH_SIZE="15000"
             TEST_TYPE="quick"
+            TEST_ENGINE="python"
+            PGBENCH_CLIENTS="1"
             CLEANUP_DATA="true"
           fi
           
           echo "record_count=$RECORD_COUNT" >> $GITHUB_OUTPUT
           echo "batch_size=$BATCH_SIZE" >> $GITHUB_OUTPUT
           echo "test_type=$TEST_TYPE" >> $GITHUB_OUTPUT
+          echo "test_engine=$TEST_ENGINE" >> $GITHUB_OUTPUT
+          echo "pgbench_clients=$PGBENCH_CLIENTS" >> $GITHUB_OUTPUT
           echo "cleanup_data=$CLEANUP_DATA" >> $GITHUB_OUTPUT
           
           echo "📊 Performance test parameters:"
           echo "  Record count: $RECORD_COUNT"
           echo "  Batch size: $BATCH_SIZE"
           echo "  Test type: $TEST_TYPE"
+          echo "  Test engine: $TEST_ENGINE"
+          echo "  pgbench clients: $PGBENCH_CLIENTS"
           echo "  Cleanup data: $CLEANUP_DATA"
 
       - name: Run performance tests
@@ -155,16 +179,42 @@ jobs:
             CLEANUP_FLAG="--cleanup"
           fi
           
-          # Run performance tests with parameters
-          python run_performance_tests.py \
-            --records ${{ steps.test_params.outputs.record_count }} \
-            --batch-size ${{ steps.test_params.outputs.batch_size }} \
-            --test-type ${{ steps.test_params.outputs.test_type }} \
-            --output-format json \
-            --output-file performance-results/results.json \
-            --log-level INFO \
-            --timeout 5400 \
-            $CLEANUP_FLAG
+          TEST_ENGINE="${{ steps.test_params.outputs.test_engine }}"
+          
+          # Run Python tests
+          if [ "$TEST_ENGINE" = "python" ] || [ "$TEST_ENGINE" = "both" ]; then
+            echo "🐍 Running Python performance tests..."
+            python run_performance_tests.py \
+              --records ${{ steps.test_params.outputs.record_count }} \
+              --batch-size ${{ steps.test_params.outputs.batch_size }} \
+              --test-type ${{ steps.test_params.outputs.test_type }} \
+              --output-format json \
+              --output-file performance-results/python-results.json \
+              --log-level INFO \
+              --timeout 5400 \
+              $CLEANUP_FLAG
+          fi
+          
+          # Run pgbench tests
+          if [ "$TEST_ENGINE" = "pgbench" ] || [ "$TEST_ENGINE" = "both" ]; then
+            echo "⚡ Running pgbench performance tests..."
+            
+            # Skip data generation if Python tests already ran
+            SKIP_DATA_FLAG=""
+            if [ "$TEST_ENGINE" = "both" ]; then
+              SKIP_DATA_FLAG="--skip-data-generation"
+            fi
+            
+            python run_pgbench_performance_tests.py \
+              --database-url "${DATABASE_URL}" \
+              --records ${{ steps.test_params.outputs.record_count }} \
+              --batch-size ${{ steps.test_params.outputs.batch_size }} \
+              --clients ${{ steps.test_params.outputs.pgbench_clients }} \
+              --test-type ${{ steps.test_params.outputs.test_type }} \
+              --output-file performance-results/pgbench-results.json \
+              --log-level INFO \
+              $SKIP_DATA_FLAG
+          fi
           
           echo "✅ Performance tests completed"
 
@@ -172,13 +222,6 @@ jobs:
         if: always() && steps.run_tests.outcome != 'cancelled'
         run: |
           echo "📊 Generating performance analysis reports..."
-          
-          # Generate GitHub summary from results
-          python run_performance_tests.py \
-            --test-type query-only \
-            --output-format github \
-            --output-file performance-results/github-summary.md \
-            --skip-schema-setup 2>/dev/null || true
           
           # Create a comprehensive HTML report
           cat > performance-results/index.html << 'EOF'
@@ -195,6 +238,9 @@ jobs:
                   .success { border-left: 4px solid #28a745; }
                   .warning { border-left: 4px solid #ffc107; }
                   .error { border-left: 4px solid #dc3545; }
+                  .engine-section { border: 1px solid #dee2e6; border-radius: 8px; margin: 1rem 0; padding: 1rem; }
+                  .engine-python { background: #f8f9fa; }
+                  .engine-pgbench { background: #e3f2fd; }
                   table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
                   th, td { padding: 0.75rem; text-align: left; border-bottom: 1px solid #dee2e6; }
                   th { background-color: #f8f9fa; font-weight: 600; }
@@ -213,8 +259,10 @@ jobs:
               <div class="metric success">
                   <h3>Test Configuration</h3>
                   <p><strong>Type:</strong> ${{ steps.test_params.outputs.test_type }}</p>
+                  <p><strong>Engine:</strong> ${{ steps.test_params.outputs.test_engine }}</p>
                   <p><strong>Records:</strong> ${{ steps.test_params.outputs.record_count }}</p>
                   <p><strong>Batch Size:</strong> ${{ steps.test_params.outputs.batch_size }}</p>
+                  <p><strong>pgbench Clients:</strong> ${{ steps.test_params.outputs.pgbench_clients }}</p>
                   <p><strong>Database:</strong> Neon (performance/run-${{ github.run_number }})</p>
               </div>
               
@@ -223,27 +271,37 @@ jobs:
               </div>
               
               <script>
-                  // Load and display JSON results
-                  fetch('results.json')
-                      .then(response => response.json())
-                      .then(data => {
-                          const container = document.getElementById('results-container');
-                          container.innerHTML = formatResults(data);
-                      })
-                      .catch(error => {
-                          console.error('Error loading results:', error);
-                          document.getElementById('results-container').innerHTML = 
-                              '<div class="metric error"><h3>Error</h3><p>Failed to load detailed results.</p></div>';
-                      });
-              
-                  function formatResults(data) {
+                  // Load and display results from both engines
+                  Promise.allSettled([
+                      fetch('python-results.json').then(r => r.json()).catch(() => null),
+                      fetch('pgbench-results.json').then(r => r.json()).catch(() => null)
+                  ]).then(([pythonResult, pgbenchResult]) => {
+                      const container = document.getElementById('results-container');
                       let html = '';
+                      
+                      if (pythonResult.status === 'fulfilled' && pythonResult.value) {
+                          html += formatPythonResults(pythonResult.value);
+                      }
+                      
+                      if (pgbenchResult.status === 'fulfilled' && pgbenchResult.value) {
+                          html += formatPgbenchResults(pgbenchResult.value);
+                      }
+                      
+                      if (!html) {
+                          html = '<div class="metric error"><h3>Error</h3><p>No results could be loaded.</p></div>';
+                      }
+                      
+                      container.innerHTML = html;
+                  });
+              
+                  function formatPythonResults(data) {
+                      let html = '<div class="engine-section engine-python"><h2>🐍 Python Performance Results</h2>';
                       
                       // Summary
                       if (data.summary) {
                           html += `
                               <div class="metric success">
-                                  <h3>📈 Summary</h3>
+                                  <h3>📈 Python Summary</h3>
                                   <p><strong>Total Tests:</strong> ${data.summary.total_tests}</p>
                                   <p><strong>Total Query Time:</strong> <span class="number">${data.summary.total_time?.toFixed(4)}s</span></p>
                                   <p><strong>Average Query Time:</strong> <span class="number">${data.summary.average_time?.toFixed(4)}s</span></p>
@@ -251,18 +309,7 @@ jobs:
                           `;
                       }
                       
-                      // Meta information
-                      if (data.meta) {
-                          html += `
-                              <div class="metric">
-                                  <h3>⚡ Execution Details</h3>
-                                  <p><strong>Total Execution Time:</strong> <span class="number">${data.meta.total_execution_time?.toFixed(2)}s</span></p>
-                                  <p><strong>Database Host:</strong> ${data.meta.database_url_host || 'localhost'}</p>
-                              </div>
-                          `;
-                      }
-                      
-                      // Detailed results
+                      // Detailed results processing (existing logic)
                       if (data.detailed_results) {
                           for (const [category, tests] of Object.entries(data.detailed_results)) {
                               if (typeof tests === 'object' && tests !== null) {
@@ -271,7 +318,6 @@ jobs:
                                   
                                   for (const [testName, result] of Object.entries(tests)) {
                                       if (result && typeof result === 'object') {
-                                          // Standard query results with execution_time
                                           if (result.execution_time !== undefined) {
                                               html += `
                                                   <tr>
@@ -281,7 +327,6 @@ jobs:
                                                   </tr>
                                               `;
                                           } 
-                                          // Handle function performance data
                                           else if (result.avg_time !== undefined) {
                                               html += `
                                                   <tr>
@@ -292,7 +337,6 @@ jobs:
                                               `;
                                           }
                                       } 
-                                      // Handle scalar values (like single_update_avg)
                                       else if (typeof result === 'number') {
                                           const unit = testName.includes('time') || testName.includes('avg') ? 's' : 
                                                       testName.includes('rate') ? ' records/sec' : '';
@@ -310,6 +354,66 @@ jobs:
                           }
                       }
                       
+                      html += '</div>';
+                      return html;
+                  }
+                  
+                  function formatPgbenchResults(data) {
+                      let html = '<div class="engine-section engine-pgbench"><h2>⚡ pgbench Performance Results</h2>';
+                      
+                      // Summary
+                      if (data.summary) {
+                          html += `
+                              <div class="metric success">
+                                  <h3>📈 pgbench Summary</h3>
+                                  <p><strong>Total Tests:</strong> ${data.summary.total_tests}</p>
+                                  <p><strong>Successful Tests:</strong> ${data.summary.successful_tests}</p>
+                                  <p><strong>Failed Tests:</strong> ${data.summary.failed_tests}</p>
+                                  <p><strong>Total Execution Time:</strong> <span class="number">${data.summary.total_time?.toFixed(4)}s</span></p>
+                                  <p><strong>Average Test Time:</strong> <span class="number">${data.summary.average_time?.toFixed(4)}s</span></p>
+                              </div>
+                          `;
+                      }
+                      
+                      // Detailed results
+                      if (data.detailed_results) {
+                          for (const [category, result] of Object.entries(data.detailed_results)) {
+                              if (result && typeof result === 'object') {
+                                  html += `<div class="metric"><h3>${category.replace(/_/g, ' ').toUpperCase()}</h3>`;
+                                  html += '<table>';
+                                  
+                                  if (result.pgbench_stats) {
+                                      const stats = result.pgbench_stats;
+                                      html += `
+                                          <tr>
+                                              <td>Execution Time</td>
+                                              <td class="number">${result.execution_time?.toFixed(4)}s</td>
+                                              <td></td>
+                                          </tr>
+                                          <tr>
+                                              <td>TPS (Transactions/sec)</td>
+                                              <td class="number">${stats.tps?.toFixed(2)}</td>
+                                              <td></td>
+                                          </tr>
+                                          <tr>
+                                              <td>Average Latency</td>
+                                              <td class="number">${stats.latency_avg_ms?.toFixed(2)}ms</td>
+                                              <td></td>
+                                          </tr>
+                                          <tr>
+                                              <td>Transactions Processed</td>
+                                              <td class="number">${stats.transactions_processed || 'N/A'}</td>
+                                              <td></td>
+                                          </tr>
+                                      `;
+                                  }
+                                  
+                                  html += '</table></div>';
+                              }
+                          }
+                      }
+                      
+                      html += '</div>';
                       return html;
                   }
               </script>
