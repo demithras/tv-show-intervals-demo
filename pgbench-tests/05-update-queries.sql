@@ -3,12 +3,8 @@
 
 \set random_channel random(1, 500)
 \set random_priority random(1, 3)
-\set random_category random(1, 10)
 \set channel_start random(1, 450)
 \set channel_end (:channel_start + 50)
-
--- Map random numbers to actual categories
-\set category_name 'News'
 
 -- Choose random update type
 \set update_type random(1, 4)
@@ -21,17 +17,17 @@ WHERE id = (
     WHERE channel_id IS NOT NULL 
     ORDER BY RANDOM() 
     LIMIT 1
-) AND :update_type = 1;
+) AND 1 = (:update_type % 4) + 1;
 
 -- Update 2: Batch update by category
 UPDATE programs 
 SET priority = :random_priority 
-WHERE category = :category_name AND :update_type = 2;
+WHERE category = 'News' AND 2 = (:update_type % 4) + 1;
 
 -- Update 3: Batch update by channel range
 UPDATE programs 
 SET priority = :random_priority 
-WHERE channel_id BETWEEN :channel_start AND :channel_end AND :update_type = 3;
+WHERE channel_id BETWEEN :channel_start AND :channel_end AND 3 = (:update_type % 4) + 1;
 
 -- Update 4: Update start time (triggers interval recalculation)
 UPDATE programs 
@@ -41,4 +37,4 @@ WHERE id = (
     WHERE category = 'Movies' AND start_time != '19:30'
     ORDER BY RANDOM() 
     LIMIT 1
-) AND :update_type = 4;
+) AND 4 = (:update_type % 4) + 1;

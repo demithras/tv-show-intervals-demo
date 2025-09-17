@@ -1,7 +1,6 @@
 -- Aggregation Performance Tests for pgbench
 -- Tests complex GROUP BY and aggregate functions
 
-\set random_category random(1, 10)
 \set random_channel random(1, 500)
 
 -- Choose random query type
@@ -16,7 +15,7 @@ SELECT
     COUNT(*) as program_count
 FROM programs p 
 JOIN program_intervals pi ON p.program_name = pi.program_name 
-WHERE p.category IS NOT NULL AND :query_type = 1
+WHERE p.category IS NOT NULL AND 1 = (:query_type % 5) + 1
 GROUP BY category 
 ORDER BY avg_intervals DESC;
 
@@ -29,7 +28,7 @@ SELECT
     AVG(interval_count) as avg_intervals
 FROM programs p 
 JOIN program_intervals pi ON p.program_name = pi.program_name 
-WHERE p.channel_id IS NOT NULL AND p.day_of_week IS NOT NULL AND :query_type = 2
+WHERE p.channel_id IS NOT NULL AND p.day_of_week IS NOT NULL AND 2 = (:query_type % 5) + 1
 GROUP BY channel_id, day_of_week 
 HAVING COUNT(*) > 5
 ORDER BY total_intervals DESC 
@@ -43,7 +42,7 @@ SELECT
     COUNT(DISTINCT category) as unique_categories
 FROM programs p 
 JOIN program_intervals pi ON p.program_name = pi.program_name 
-WHERE :query_type = 3
+WHERE 3 = (:query_type % 5) + 1
 GROUP BY EXTRACT(HOUR FROM start_time) 
 ORDER BY hour;
 
@@ -56,7 +55,7 @@ SELECT
     STDDEV(interval_count) as stddev_intervals
 FROM programs p 
 JOIN program_intervals pi ON p.program_name = pi.program_name 
-WHERE p.category IS NOT NULL AND p.priority IS NOT NULL AND :query_type = 4
+WHERE p.category IS NOT NULL AND p.priority IS NOT NULL AND 4 = (:query_type % 5) + 1
 GROUP BY category, priority
 ORDER BY category, priority;
 
@@ -67,6 +66,6 @@ SELECT
     COUNT(*) as total_programs,
     ROUND(100.0 * COUNT(CASE WHEN start_time > end_time THEN 1 END) / COUNT(*), 2) as overnight_percentage
 FROM programs
-WHERE day_of_week IS NOT NULL AND :query_type = 5
+WHERE day_of_week IS NOT NULL AND 5 = (:query_type % 5) + 1
 GROUP BY day_of_week
 ORDER BY day_of_week;

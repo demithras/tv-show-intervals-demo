@@ -139,20 +139,41 @@ class PgbenchPerformanceRunner:
             
             # Parse key metrics from pgbench output
             if 'number of transactions actually processed:' in line:
-                stats['transactions_processed'] = int(line.split(':')[1].strip())
+                try:
+                    # Handle format like "25/25" or just "25"
+                    value_part = line.split(':')[1].strip()
+                    if '/' in value_part:
+                        # Take the first number from "25/25" format
+                        stats['transactions_processed'] = int(value_part.split('/')[0])
+                    else:
+                        stats['transactions_processed'] = int(value_part)
+                except (ValueError, IndexError) as e:
+                    logger.debug(f"Could not parse transactions: {line} - {e}")
             elif 'latency average =' in line:
-                # Extract latency value (format: "latency average = 123.456 ms")
-                latency_part = line.split('=')[1].strip()
-                stats['latency_avg_ms'] = float(latency_part.split()[0])
+                try:
+                    # Extract latency value (format: "latency average = 123.456 ms")
+                    latency_part = line.split('=')[1].strip()
+                    stats['latency_avg_ms'] = float(latency_part.split()[0])
+                except (ValueError, IndexError) as e:
+                    logger.debug(f"Could not parse latency: {line} - {e}")
             elif 'initial connection time =' in line:
-                conn_time = line.split('=')[1].strip()
-                stats['connection_time_ms'] = float(conn_time.split()[0])
+                try:
+                    conn_time = line.split('=')[1].strip()
+                    stats['connection_time_ms'] = float(conn_time.split()[0])
+                except (ValueError, IndexError) as e:
+                    logger.debug(f"Could not parse connection time: {line} - {e}")
             elif 'tps =' in line:
-                # Extract TPS (format: "tps = 123.456 (including connections establishing)")
-                tps_part = line.split('=')[1].strip()
-                stats['tps'] = float(tps_part.split()[0])
+                try:
+                    # Extract TPS (format: "tps = 123.456 (including connections establishing)")
+                    tps_part = line.split('=')[1].strip()
+                    stats['tps'] = float(tps_part.split()[0])
+                except (ValueError, IndexError) as e:
+                    logger.debug(f"Could not parse TPS: {line} - {e}")
             elif 'number of failed transactions:' in line:
-                stats['failed_transactions'] = int(line.split(':')[1].strip())
+                try:
+                    stats['failed_transactions'] = int(line.split(':')[1].strip())
+                except (ValueError, IndexError) as e:
+                    logger.debug(f"Could not parse failed transactions: {line} - {e}")
                 
         return stats
 
