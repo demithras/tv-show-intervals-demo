@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Performance Test Results - Run #10</title>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 2rem; }
+        .header { border-bottom: 2px solid #eee; padding-bottom: 1rem; margin-bottom: 2rem; }
+        .metric { background: #f8f9fa; padding: 1rem; border-radius: 8px; margin: 1rem 0; }
+        .metric h3 { margin-top: 0; color: #0969da; }
+        .success { border-left: 4px solid #28a745; }
+        .warning { border-left: 4px solid #ffc107; }
+        .error { border-left: 4px solid #dc3545; }
+        .engine-section { border: 1px solid #dee2e6; border-radius: 8px; margin: 1rem 0; padding: 1rem; }
+        .engine-python { background: #f8f9fa; }
+        .engine-pgbench { background: #e3f2fd; }
+        table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+        th, td { padding: 0.75rem; text-align: left; border-bottom: 1px solid #dee2e6; }
+        th { background-color: #f8f9fa; font-weight: 600; }
+        .number { font-family: 'SF Mono', Consolas, monospace; }
+        .meta { color: #586069; font-size: 0.9em; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📊 Performance Test Results</h1>
+        <div class="meta">
+            Run #10 • 822efcc6c2a5910bac54fc8bc3b381b1213ad421 • $(date -u +"%Y-%m-%d %H:%M UTC")
+        </div>
+    </div>
+    
+    <div class="metric success">
+        <h3>Test Configuration</h3>
+        <p><strong>Type:</strong> full</p>
+        <p><strong>Engine:</strong> both</p>
+        <p><strong>Records:</strong> 500000</p>
+        <p><strong>Batch Size:</strong> 15000</p>
+        <p><strong>pgbench Clients:</strong> 1</p>
+        <p><strong>Database:</strong> Neon (performance/run-10)</p>
+    </div>
+    
+    <div id="results-container">
+        <p>Loading detailed results...</p>
+    </div>
+    
+    <script>
+        // Load and display results from both engines
+        Promise.allSettled([
+            fetch('python-results.json').then(r => r.json()).catch(() => null),
+            fetch('pgbench-results.json').then(r => r.json()).catch(() => null)
+        ]).then(([pythonResult, pgbenchResult]) => {
+            const container = document.getElementById('results-container');
+            let html = '';
+            
+            if (pythonResult.status === 'fulfilled' && pythonResult.value) {
+                html += formatPythonResults(pythonResult.value);
+            }
+            
+            if (pgbenchResult.status === 'fulfilled' && pgbenchResult.value) {
+                html += formatPgbenchResults(pgbenchResult.value);
+            }
+            
+            if (!html) {
+                html = '<div class="metric error"><h3>Error</h3><p>No results could be loaded.</p></div>';
+            }
+            
+            container.innerHTML = html;
+        });
+    
+        function formatPythonResults(data) {
+            let html = '<div class="engine-section engine-python"><h2>🐍 Python Performance Results</h2>';
+            
+            // Summary
+            if (data.summary) {
+                html += `
+                    <div class="metric success">
+                        <h3>📈 Python Summary</h3>
+                        <p><strong>Total Tests:</strong> ${data.summary.total_tests}</p>
+                        <p><strong>Total Query Time:</strong> <span class="number">${data.summary.total_time?.toFixed(4)}s</span></p>
+                        <p><strong>Average Query Time:</strong> <span class="number">${data.summary.average_time?.toFixed(4)}s</span></p>
+                    </div>
+                `;
+            }
+            
+            // Detailed results processing (existing logic)
+            if (data.detailed_results) {
+                for (const [category, tests] of Object.entries(data.detailed_results)) {
+                    if (typeof tests === 'object' && tests !== null) {
+                        html += `<div class="metric"><h3>${category.replace(/_/g, ' ').toUpperCase()}</h3>`;
+                        html += '<table>';
+                        
+                        for (const [testName, result] of Object.entries(tests)) {
+                            if (result && typeof result === 'object') {
+                                if (result.execution_time !== undefined) {
+                                    html += `
+                                        <tr>
+                                            <td>${testName}</td>
+                                            <td class="number">${result.execution_time.toFixed(4)}s</td>
+                                            <td class="number">${result.row_count?.toLocaleString() || 0} rows</td>
+                                        </tr>
+                                    `;
+                                } 
+                                else if (result.avg_time !== undefined) {
+                                    html += `
+                                        <tr>
+                                            <td>${testName}</td>
+                                            <td class="number">${result.avg_time.toFixed(4)}s avg</td>
+                                            <td class="number">${result.test_count || 1} tests</td>
+                                        </tr>
+                                    `;
+                                }
+                            } 
+                            else if (typeof result === 'number') {
+                                const unit = testName.includes('time') || testName.includes('avg') ? 's' : 
+                                            testName.includes('rate') ? ' records/sec' : '';
+                                html += `
+                                    <tr>
+                                        <td>${testName.replace(/_/g, ' ')}</td>
+                                        <td class="number">${result.toFixed(4)}${unit}</td>
+                                        <td></td>
+                                    </tr>
+                                `;
+                            }
+                        }
+                        html += '</table></div>';
+                    }
+                }
+            }
+            
+            html += '</div>';
+            return html;
+        }
+        
+        function formatPgbenchResults(data) {
+            let html = '<div class="engine-section engine-pgbench"><h2>⚡ pgbench Performance Results</h2>';
+            
+            // Summary
+            if (data.summary) {
+                html += `
+                    <div class="metric success">
+                        <h3>📈 pgbench Summary</h3>
+                        <p><strong>Total Tests:</strong> ${data.summary.total_tests}</p>
+                        <p><strong>Successful Tests:</strong> ${data.summary.successful_tests}</p>
+                        <p><strong>Failed Tests:</strong> ${data.summary.failed_tests}</p>
+                        <p><strong>Total Execution Time:</strong> <span class="number">${data.summary.total_time?.toFixed(4)}s</span></p>
+                        <p><strong>Average Test Time:</strong> <span class="number">${data.summary.average_time?.toFixed(4)}s</span></p>
+                    </div>
+                `;
+            }
+            
+            // Detailed results
+            if (data.detailed_results) {
+                for (const [category, result] of Object.entries(data.detailed_results)) {
+                    if (result && typeof result === 'object') {
+                        html += `<div class="metric"><h3>${category.replace(/_/g, ' ').toUpperCase()}</h3>`;
+                        html += '<table>';
+                        
+                        if (result.pgbench_stats) {
+                            const stats = result.pgbench_stats;
+                            html += `
+                                <tr>
+                                    <td>Execution Time</td>
+                                    <td class="number">${result.execution_time?.toFixed(4)}s</td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td>TPS (Transactions/sec)</td>
+                                    <td class="number">${stats.tps?.toFixed(2)}</td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td>Average Latency</td>
+                                    <td class="number">${stats.latency_avg_ms?.toFixed(2)}ms</td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td>Transactions Processed</td>
+                                    <td class="number">${stats.transactions_processed || 'N/A'}</td>
+                                    <td></td>
+                                </tr>
+                            `;
+                        }
+                        
+                        html += '</table></div>';
+                    }
+                }
+            }
+            
+            html += '</div>';
+            return html;
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,109 @@
+{
+  "summary": {
+    "total_tests": 7,
+    "successful_tests": 7,
+    "failed_tests": 0,
+    "total_time": 332.0081989765167,
+    "average_time": 47.42974271093096
+  },
+  "detailed_results": {
+    "basic_queries_pgbench": {
+      "execution_time": 53.89169764518738,
+      "pgbench_stats": {
+        "transactions_processed": 50,
+        "latency_avg_ms": 1042.846,
+        "connection_time_ms": 854.605,
+        "tps": 0.958915
+      },
+      "success": true,
+      "description": "Basic queries (count, aggregations, top-N)",
+      "clients": 1,
+      "transactions_per_client": 50,
+      "raw_output": "pgbench (16.10 (Ubuntu 16.10-1.pgdg24.04+1), server 17.5 (a42a079))\ntransaction type: pgbench-tests/01-basic-queries.sql\nscaling factor: 1\nquery mode: extended\nnumber of clients: 1\nnumber of threads: 1\nmaximum number of tries: 1\nnumber of transactions per client: 50\nnumber of transactions actually processed: 50/50\nnumber of failed transactions: 0 (0.000%)\nlatency average = 1042.846 ms\ninitial connection time = 854.605 ms\ntps = 0.958915 (without initial connection time)\n"
+    },
+    "filtered_queries_pgbench": {
+      "execution_time": 76.14801979064941,
+      "pgbench_stats": {
+        "transactions_processed": 50,
+        "latency_avg_ms": 1488.556,
+        "connection_time_ms": 826.082,
+        "tps": 0.671792
+      },
+      "success": true,
+      "description": "Filtered queries (WHERE clauses, indexes)",
+      "clients": 1,
+      "transactions_per_client": 50,
+      "raw_output": "pgbench (16.10 (Ubuntu 16.10-1.pgdg24.04+1), server 17.5 (a42a079))\ntransaction type: pgbench-tests/02-filtered-queries.sql\nscaling factor: 1\nquery mode: extended\nnumber of clients: 1\nnumber of threads: 1\nmaximum number of tries: 1\nnumber of transactions per client: 50\nnumber of transactions actually processed: 50/50\nnumber of failed transactions: 0 (0.000%)\nlatency average = 1488.556 ms\ninitial connection time = 826.082 ms\ntps = 0.671792 (without initial connection time)\n"
+    },
+    "aggregation_queries_pgbench": {
+      "execution_time": 31.77832055091858,
+      "pgbench_stats": {
+        "transactions_processed": 25,
+        "latency_avg_ms": 1204.978,
+        "connection_time_ms": 816.183,
+        "tps": 0.829891
+      },
+      "success": true,
+      "description": "Complex aggregations (GROUP BY, HAVING)",
+      "clients": 1,
+      "transactions_per_client": 25,
+      "raw_output": "pgbench (16.10 (Ubuntu 16.10-1.pgdg24.04+1), server 17.5 (a42a079))\ntransaction type: pgbench-tests/03-aggregation-queries.sql\nscaling factor: 1\nquery mode: extended\nnumber of clients: 1\nnumber of threads: 1\nmaximum number of tries: 1\nnumber of transactions per client: 25\nnumber of transactions actually processed: 25/25\nnumber of failed transactions: 0 (0.000%)\nlatency average = 1204.978 ms\ninitial connection time = 816.183 ms\ntps = 0.829891 (without initial connection time)\n"
+    },
+    "join_performance_pgbench": {
+      "execution_time": 55.884111404418945,
+      "pgbench_stats": {
+        "transactions_processed": 50,
+        "latency_avg_ms": 1084.328,
+        "connection_time_ms": 813.86,
+        "tps": 0.92223
+      },
+      "success": true,
+      "description": "JOIN queries (INNER, LEFT, with aggregations)",
+      "clients": 1,
+      "transactions_per_client": 50,
+      "raw_output": "pgbench (16.10 (Ubuntu 16.10-1.pgdg24.04+1), server 17.5 (a42a079))\ntransaction type: pgbench-tests/04-join-queries.sql\nscaling factor: 1\nquery mode: extended\nnumber of clients: 1\nnumber of threads: 1\nmaximum number of tries: 1\nnumber of transactions per client: 50\nnumber of transactions actually processed: 50/50\nnumber of failed transactions: 0 (0.000%)\nlatency average = 1084.328 ms\ninitial connection time = 813.860 ms\ntps = 0.922230 (without initial connection time)\n"
+    },
+    "index_effectiveness_pgbench": {
+      "execution_time": 47.73942589759827,
+      "pgbench_stats": {
+        "transactions_processed": 50,
+        "latency_avg_ms": 921.218,
+        "connection_time_ms": 828.861,
+        "tps": 1.085519
+      },
+      "success": true,
+      "description": "Index utilization tests",
+      "clients": 1,
+      "transactions_per_client": 50,
+      "raw_output": "pgbench (16.10 (Ubuntu 16.10-1.pgdg24.04+1), server 17.5 (a42a079))\ntransaction type: pgbench-tests/06-index-queries.sql\nscaling factor: 1\nquery mode: extended\nnumber of clients: 1\nnumber of threads: 1\nmaximum number of tries: 1\nnumber of transactions per client: 50\nnumber of transactions actually processed: 50/50\nnumber of failed transactions: 0 (0.000%)\nlatency average = 921.218 ms\ninitial connection time = 828.861 ms\ntps = 1.085519 (without initial connection time)\n"
+    },
+    "update_performance_pgbench": {
+      "execution_time": 29.517122745513916,
+      "pgbench_stats": {
+        "transactions_processed": 12,
+        "latency_avg_ms": 2321.798,
+        "connection_time_ms": 808.568,
+        "tps": 0.430701
+      },
+      "success": true,
+      "description": "UPDATE queries (single, batch, trigger overhead)",
+      "clients": 1,
+      "transactions_per_client": 12,
+      "raw_output": "pgbench (16.10 (Ubuntu 16.10-1.pgdg24.04+1), server 17.5 (a42a079))\ntransaction type: pgbench-tests/05-update-queries.sql\nscaling factor: 1\nquery mode: extended\nnumber of clients: 1\nnumber of threads: 1\nmaximum number of tries: 1\nnumber of transactions per client: 12\nnumber of transactions actually processed: 12/12\nnumber of failed transactions: 0 (0.000%)\nlatency average = 2321.798 ms\ninitial connection time = 808.568 ms\ntps = 0.430701 (without initial connection time)\n"
+    },
+    "overnight_performance_pgbench": {
+      "execution_time": 37.049500942230225,
+      "pgbench_stats": {
+        "transactions_processed": 50,
+        "latency_avg_ms": 707.428,
+        "connection_time_ms": 824.335,
+        "tps": 1.413571
+      },
+      "success": true,
+      "description": "Overnight program calculations",
+      "clients": 1,
+      "transactions_per_client": 50,
+      "raw_output": "pgbench (16.10 (Ubuntu 16.10-1.pgdg24.04+1), server 17.5 (a42a079))\ntransaction type: pgbench-tests/07-overnight-queries.sql\nscaling factor: 1\nquery mode: extended\nnumber of clients: 1\nnumber of threads: 1\nmaximum number of tries: 1\nnumber of transactions per client: 50\nnumber of transactions actually processed: 50/50\nnumber of failed transactions: 0 (0.000%)\nlatency average = 707.428 ms\ninitial connection time = 824.335 ms\ntps = 1.413571 (without initial connection time)\n"
+    }
+  }
+}
