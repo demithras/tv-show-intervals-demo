@@ -56,6 +56,15 @@ class PerformanceComparer:
             'index_effectiveness': 'index_effectiveness_pgbench'
         }
         
+        # Add direct comparison mapping for single transaction tests
+        direct_comparison_mapping = {
+            'basic_queries.Count all programs': 'direct_comparison_pgbench.count-programs',
+            'basic_queries.Count all intervals': 'direct_comparison_pgbench.count-intervals',
+            'basic_queries.Top 100 by intervals': 'direct_comparison_pgbench.top-100-intervals',
+            'filtered_queries.Filter by category (News)': 'direct_comparison_pgbench.filter-news',
+            'index_effectiveness.Category filter (should use idx_programs_category)': 'direct_comparison_pgbench.filter-sports'
+        }
+        
         python_results = python_data.get('detailed_results', {})
         pgbench_results = pgbench_data.get('detailed_results', {})
         

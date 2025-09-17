@@ -177,9 +177,9 @@ class PgbenchPerformanceRunner:
                 
         return stats
 
-    def test_basic_queries(self, clients=1, transactions=50):
+    def test_basic_queries(self, clients=1, transactions=1):
         """Run basic query performance tests."""
-        logger.info("=== Testing Basic Query Performance (pgbench) ===")
+        logger.info("=== Testing Basic Query Performance (pgbench - single tx) ===")
         
         test_file = self.pgbench_tests_dir / "01-basic-queries.sql"
         if not test_file.exists():
@@ -190,14 +190,14 @@ class PgbenchPerformanceRunner:
             test_file, 
             clients=clients, 
             transactions=transactions,
-            description="Basic queries (count, aggregations, top-N)"
+            description="Basic queries (count, aggregations, top-N) - single transaction"
         )
         
         self.results['basic_queries_pgbench'] = result
 
-    def test_filtered_queries(self, clients=1, transactions=50):
+    def test_filtered_queries(self, clients=1, transactions=1):
         """Run filtered query performance tests."""
-        logger.info("=== Testing Filtered Query Performance (pgbench) ===")
+        logger.info("=== Testing Filtered Query Performance (pgbench - single tx) ===")
         
         test_file = self.pgbench_tests_dir / "02-filtered-queries.sql"
         if not test_file.exists():
@@ -208,14 +208,14 @@ class PgbenchPerformanceRunner:
             test_file,
             clients=clients,
             transactions=transactions,
-            description="Filtered queries (WHERE clauses, indexes)"
+            description="Filtered queries (WHERE clauses, indexes) - single transaction"
         )
         
         self.results['filtered_queries_pgbench'] = result
 
-    def test_aggregation_queries(self, clients=1, transactions=30):
+    def test_aggregation_queries(self, clients=1, transactions=1):
         """Run aggregation performance tests."""
-        logger.info("=== Testing Aggregation Performance (pgbench) ===")
+        logger.info("=== Testing Aggregation Performance (pgbench - single tx) ===")
         
         test_file = self.pgbench_tests_dir / "03-aggregation-queries.sql"
         if not test_file.exists():
@@ -226,14 +226,14 @@ class PgbenchPerformanceRunner:
             test_file,
             clients=clients,
             transactions=transactions,
-            description="Complex aggregations (GROUP BY, HAVING)"
+            description="Complex aggregations (GROUP BY, HAVING) - single transaction"
         )
         
         self.results['aggregation_queries_pgbench'] = result
 
-    def test_join_performance(self, clients=1, transactions=40):
+    def test_join_performance(self, clients=1, transactions=1):
         """Run JOIN performance tests."""
-        logger.info("=== Testing JOIN Performance (pgbench) ===")
+        logger.info("=== Testing JOIN Performance (pgbench - single tx) ===")
         
         test_file = self.pgbench_tests_dir / "04-join-queries.sql"
         if not test_file.exists():
@@ -244,14 +244,14 @@ class PgbenchPerformanceRunner:
             test_file,
             clients=clients,
             transactions=transactions,
-            description="JOIN queries (INNER, LEFT, with aggregations)"
+            description="JOIN queries (INNER, LEFT, with aggregations) - single transaction"
         )
         
         self.results['join_performance_pgbench'] = result
 
-    def test_update_performance(self, clients=1, transactions=20):
+    def test_update_performance(self, clients=1, transactions=1):
         """Run UPDATE performance tests."""
-        logger.info("=== Testing UPDATE Performance (pgbench) ===")
+        logger.info("=== Testing UPDATE Performance (pgbench - single tx) ===")
         
         test_file = self.pgbench_tests_dir / "05-update-queries.sql"
         if not test_file.exists():
@@ -262,14 +262,14 @@ class PgbenchPerformanceRunner:
             test_file,
             clients=clients,
             transactions=transactions,
-            description="UPDATE queries (single, batch, trigger overhead)"
+            description="UPDATE queries (single, batch, trigger overhead) - single transaction"
         )
         
         self.results['update_performance_pgbench'] = result
 
-    def test_index_effectiveness(self, clients=1, transactions=50):
+    def test_index_effectiveness(self, clients=1, transactions=1):
         """Run index effectiveness tests."""
-        logger.info("=== Testing Index Effectiveness (pgbench) ===")
+        logger.info("=== Testing Index Effectiveness (pgbench - single tx) ===")
         
         test_file = self.pgbench_tests_dir / "06-index-queries.sql"
         if not test_file.exists():
@@ -280,14 +280,14 @@ class PgbenchPerformanceRunner:
             test_file,
             clients=clients,
             transactions=transactions,
-            description="Index utilization tests"
+            description="Index utilization tests - single transaction"
         )
         
         self.results['index_effectiveness_pgbench'] = result
 
-    def test_overnight_program_performance(self, clients=1, transactions=30):
+    def test_overnight_program_performance(self, clients=1, transactions=1):
         """Run overnight program performance tests."""
-        logger.info("=== Testing Overnight Program Performance (pgbench) ===")
+        logger.info("=== Testing Overnight Program Performance (pgbench - single tx) ===")
         
         test_file = self.pgbench_tests_dir / "07-overnight-queries.sql"
         if not test_file.exists():
@@ -298,10 +298,45 @@ class PgbenchPerformanceRunner:
             test_file,
             clients=clients,
             transactions=transactions,
-            description="Overnight program calculations"
+            description="Overnight program calculations - single transaction"
         )
         
         self.results['overnight_performance_pgbench'] = result
+
+    def run_direct_comparison_tests(self, clients=1):
+        """Run individual queries that directly match Python test queries."""
+        logger.info("=== Running Direct Comparison Tests (pgbench single queries) ===")
+        
+        single_tx_dir = self.pgbench_tests_dir / "single-tx"
+        if not single_tx_dir.exists():
+            logger.warning("Single transaction test directory not found, skipping direct comparison")
+            return
+        
+        direct_tests = [
+            ("count-programs.sql", "Count all programs (direct)"),
+            ("count-intervals.sql", "Count all intervals (direct)"), 
+            ("top-100-intervals.sql", "Top 100 by intervals (direct)"),
+            ("filter-news.sql", "Filter by category News (direct)"),
+            ("filter-sports.sql", "Filter by category Sports (direct)")
+        ]
+        
+        direct_results = {}
+        
+        for test_file, description in direct_tests:
+            test_path = single_tx_dir / test_file
+            if test_path.exists():
+                logger.info(f"Running direct comparison: {description}")
+                result = self.run_pgbench_test(
+                    test_path,
+                    clients=clients,
+                    transactions=1,
+                    description=description
+                )
+                direct_results[test_file.replace('.sql', '')] = result
+            else:
+                logger.warning(f"Direct comparison test not found: {test_file}")
+        
+        self.results['direct_comparison_pgbench'] = direct_results
 
     def run_concurrent_tests(self, clients=4, time_limit=60):
         """Run tests with multiple concurrent clients to test concurrency."""
@@ -392,7 +427,7 @@ class PgbenchPerformanceRunner:
             logger.info(f"  {test_name}: FAILED - {error_msg}")
 
     def run_full_pgbench_suite(self, records=1000000, batch_size=10000, clients=1, 
-                              skip_data_generation=False):
+                              skip_data_generation=False, single_transaction_mode=True):
         """Run the complete pgbench performance test suite."""
         
         if not skip_data_generation:
@@ -404,20 +439,32 @@ class PgbenchPerformanceRunner:
         
         logger.info("Running pgbench performance tests...")
         
-        # Calculate appropriate transaction counts based on dataset size
-        base_transactions = max(10, min(100, records // 10000))
+        # Set transaction counts based on mode
+        if single_transaction_mode:
+            logger.info("Running in SINGLE TRANSACTION mode for fair comparison with Python tests")
+            base_transactions = 1
+            update_transactions = 1
+        else:
+            logger.info("Running in LOAD TESTING mode with multiple transactions")
+            # Calculate appropriate transaction counts based on dataset size
+            base_transactions = max(10, min(100, records // 10000))
+            update_transactions = max(5, base_transactions // 4)
         
         # Run all test categories
         self.test_basic_queries(clients=clients, transactions=base_transactions)
         self.test_filtered_queries(clients=clients, transactions=base_transactions)
-        self.test_aggregation_queries(clients=clients, transactions=max(10, base_transactions // 2))
+        self.test_aggregation_queries(clients=clients, transactions=base_transactions)
         self.test_join_performance(clients=clients, transactions=base_transactions)
         self.test_index_effectiveness(clients=clients, transactions=base_transactions)
-        self.test_update_performance(clients=clients, transactions=max(5, base_transactions // 4))
+        self.test_update_performance(clients=clients, transactions=update_transactions)
         self.test_overnight_program_performance(clients=clients, transactions=base_transactions)
         
-        # Run concurrent tests if clients > 1
-        if clients > 1:
+        # Run direct comparison tests in single transaction mode
+        if single_transaction_mode:
+            self.run_direct_comparison_tests(clients=clients)
+        
+        # Run concurrent tests only in load testing mode
+        if not single_transaction_mode and clients > 1:
             self.run_concurrent_tests(clients=clients, time_limit=30)
         
         # Generate comprehensive report
@@ -425,7 +472,7 @@ class PgbenchPerformanceRunner:
         
         return report
 
-    def run_quick_pgbench_suite(self, records=50000, batch_size=5000, clients=1):
+    def run_quick_pgbench_suite(self, records=50000, batch_size=5000, clients=1, single_transaction_mode=True):
         """Run a quick pgbench performance test suite for CI/PR testing."""
         logger.info("Running quick pgbench performance test suite...")
         
@@ -436,10 +483,18 @@ class PgbenchPerformanceRunner:
         logger.info(f"Generating {records:,} test records...")
         self.generator.bulk_insert_programs(total_records=records, batch_size=batch_size)
         
-        # Run essential tests only with fewer transactions
-        self.test_basic_queries(clients=clients, transactions=20)
-        self.test_filtered_queries(clients=clients, transactions=20)
-        self.test_aggregation_queries(clients=clients, transactions=10)
+        # Set transaction counts based on mode
+        if single_transaction_mode:
+            logger.info("Running in SINGLE TRANSACTION mode for fair comparison")
+            transactions = 1
+        else:
+            logger.info("Running in LOAD TESTING mode")
+            transactions = 20
+        
+        # Run essential tests only
+        self.test_basic_queries(clients=clients, transactions=transactions)
+        self.test_filtered_queries(clients=clients, transactions=transactions)
+        self.test_aggregation_queries(clients=clients, transactions=transactions)
         
         # Generate report
         report = self.generate_performance_report()
@@ -456,6 +511,10 @@ def main():
     parser.add_argument('--clients', type=int, default=1, help='Number of concurrent pgbench clients')
     parser.add_argument('--test-type', choices=['full', 'quick'], default='quick', 
                        help='Type of test suite to run')
+    parser.add_argument('--single-transaction', action='store_true', 
+                       help='Run single transactions for fair comparison with Python tests (default: True)')
+    parser.add_argument('--load-testing', action='store_true',
+                       help='Run multiple transactions for load testing (overrides --single-transaction)')
     parser.add_argument('--output-file', help='JSON output file for results')
     parser.add_argument('--skip-data-generation', action='store_true', 
                        help='Skip data generation (use existing data)')
@@ -471,6 +530,9 @@ def main():
     )
     
     try:
+        # Determine transaction mode
+        single_transaction_mode = not args.load_testing  # Default to single transaction unless load testing specified
+        
         # Create pgbench runner
         runner = PgbenchPerformanceRunner(args.database_url)
         
@@ -480,13 +542,15 @@ def main():
                 records=args.records,
                 batch_size=args.batch_size,
                 clients=args.clients,
-                skip_data_generation=args.skip_data_generation
+                skip_data_generation=args.skip_data_generation,
+                single_transaction_mode=single_transaction_mode
             )
         else:
             results = runner.run_quick_pgbench_suite(
                 records=min(args.records, 50000),
                 batch_size=args.batch_size,
-                clients=args.clients
+                clients=args.clients,
+                single_transaction_mode=single_transaction_mode
             )
         
         # Save results if requested
