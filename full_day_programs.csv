@@ -1,0 +1,19 @@
+program_name,start_time,end_time
+Early Morning News,00:00,06:00
+Morning Show,06:00,09:00
+Talk Show Hour,09:00,10:00
+Game Show Classic,10:00,10:30
+Shopping Network,10:30,12:00
+Lunch Break News,12:00,12:30
+Afternoon Drama,12:30,13:30
+Soap Opera Daily,13:30,14:30
+Cooking Show,14:30,15:00
+Documentary Hour,15:00,16:00
+Kids After School,16:00,17:00
+Local News,17:00,17:30
+Evening Magazine,17:30,18:00
+Prime Time Drama,18:00,19:00
+Comedy Hour,19:00,20:00
+Reality Show,20:00,21:00
+Late Night Talk,21:00,22:01
+ ,22:00,00:00

@@ -78,35 +78,32 @@ def db_connection():
 def db_cursor(db_connection):
     """
     Provide a database cursor for each test.
-    Each test gets a clean database state.
+    For data integrity tests, preserves pre-loaded test data.
     """
     with db_connection.cursor() as cursor:
-        # Clear existing data before each test
-        cursor.execute("DELETE FROM program_intervals")
-        cursor.execute("DELETE FROM programs")
+        # Don't clear existing data - preserve loaded test data for data integrity tests
+        # The load_data.sh script should be run before tests to populate the database
         
         yield cursor
         
-        # Clean up after test
-        cursor.execute("DELETE FROM program_intervals")
-        cursor.execute("DELETE FROM programs")
+        # Don't clean up after test for data integrity tests
+        # These are read-only tests that should preserve test data
 
 
 @pytest.fixture(scope="function")
 def clean_database(db_cursor):
     """
-    Ensure database is clean before and after each test.
-    This fixture provides explicit cleanup control.
+    Provide database cursor without cleaning pre-loaded test data.
+    Note: This fixture assumes test data has been loaded via load_data.sh script.
+    It preserves test data for read-only data integrity tests.
     """
-    # Clean before test
-    db_cursor.execute("DELETE FROM program_intervals")
-    db_cursor.execute("DELETE FROM programs")
+    # Don't clean before test - preserve loaded test data
+    # Tests will work with the pre-loaded data from load_data.sh
     
     yield db_cursor
     
-    # Clean after test
-    db_cursor.execute("DELETE FROM program_intervals")
-    db_cursor.execute("DELETE FROM programs")
+    # Don't clean after test for data integrity tests
+    # These tests are read-only and should preserve the test data
 
 
 def get_program_intervals(cursor, program_name=None):

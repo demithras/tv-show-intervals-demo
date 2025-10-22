@@ -10,7 +10,10 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql
+      - ./schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./scripts/install-pgtap.sql:/docker-entrypoint-initdb.d/02-install-pgtap.sql
+      # Mount tests directory for easy access from container
+      - ./tests:/app/tests:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U demo -d demo"]
       interval: 5s
